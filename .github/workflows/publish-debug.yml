@@ -1,0 +1,76 @@
+name: Salty Publish Debug
+on:
+  push:
+    paths:
+      - "diag/PUBLISH_READY"
+permissions:
+  contents: write
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Diagnose publish stages
+        shell: bash
+        run: |
+          set +e
+          mkdir -p diag
+          LOG=diag/publish-debug.txt
+          : > "$LOG"
+          echo "commit=$GITHUB_SHA" >> "$LOG"
+
+          base64 -d publish_payload/feature-pack.lua.gz.b64 | gzip -dc > /tmp/feature.lua 2>>"$LOG"
+          echo "reconstruct=$?" >> "$LOG"
+          echo "cf9ed44a2f6e64da38b8a9263258a0199fd7442803e79c2e57ddc01a57aa53de  /tmp/feature.lua" | sha256sum -c - >>"$LOG" 2>&1
+          echo "feature_hash=$?" >> "$LOG"
+
+          curl -fsSL "https://raw.githubusercontent.com/MrRos3/Icons/main/lucide/dist/Icons.lua" -o /tmp/icons.lua 2>>"$LOG"
+          echo "icon_download=$?" >> "$LOG"
+          grep -c 'rbxassetid://' /tmp/icons.lua >> "$LOG" 2>&1
+          echo "icon_grep=$?" >> "$LOG"
+
+          python - <<'PY' >> "$LOG" 2>&1
+          from pathlib import Path
+          import re
+          root = Path('.')
+          original = (root/'latest.lua').read_text(encoding='utf-8')
+          icons_text = Path('/tmp/icons.lua').read_text(encoding='utf-8')
+          vendor = dict(re.findall(r'\["([^"]+)"\]\s*=\s*"(rbxassetid://\d+)"', icons_text))
+          print('vendor_count=' + str(len(vendor)))
+          start = original.find('local LUCIDE_IMAGES = {')
+          end = original.find('\n\nlocal function renderLucideIcon', start)
+          print('table_start=' + str(start))
+          print('table_end=' + str(end))
+          if start < 0 or end < 0:
+              raise SystemExit(3)
+          legacy = dict(re.findall(r'\["([^"]+)"\]\s*=\s*"(rbxassetid://\d+)"', original[start:end]))
+          merged = dict(vendor)
+          for k,v in legacy.items(): merged.setdefault(k,v)
+          lines=['local LUCIDE_IMAGES = {']
+          for k in sorted(merged): lines.append(f'    ["{k}"] = "{merged[k]}",')
+          lines.append('}')
+          patched = original[:start] + '\n'.join(lines) + original[end:]
+          Path('/tmp/patched.lua').write_text(patched, encoding='utf-8')
+          print('legacy_count=' + str(len(legacy)))
+          print('merged_count=' + str(len(merged)))
+          print('patched_bytes=' + str(len(patched.encode())))
+          PY
+          echo "patch_build=$?" >> "$LOG"
+
+          curl -fsSL "https://github.com/luau-lang/luau/releases/download/0.734/luau-ubuntu.zip" -o /tmp/luau.zip 2>>"$LOG"
+          echo "compiler_download=$?" >> "$LOG"
+          rm -rf /tmp/luau && mkdir -p /tmp/luau
+          unzip -q /tmp/luau.zip -d /tmp/luau 2>>"$LOG"
+          echo "compiler_unzip=$?" >> "$LOG"
+          /tmp/luau/luau-compile /tmp/feature.lua >/tmp/feature.out 2>/tmp/feature.err
+          echo "feature_compile=$?" >> "$LOG"
+          cat /tmp/feature.err >> "$LOG"
+          /tmp/luau/luau-compile /tmp/patched.lua >/tmp/patched.out 2>/tmp/patched.err
+          echo "patched_compile=$?" >> "$LOG"
+          cat /tmp/patched.err >> "$LOG"
+
+          git config user.name "MrRos3"
+          git config user.email "114161345+MrRos3@users.noreply.github.com"
+          git add diag/publish-debug.txt
+          git commit -m "Record SaltyGlass publish diagnostic"
+          git push
