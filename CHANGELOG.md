@@ -1,13 +1,36 @@
 # Changelog
 
-## SaltyGlass Library v1.0.0
+## SaltyGlass UI Library v1.1.0
 
-- Added `library.lua`, a reusable custom UI builder.
-- Added window, tab, section, label, button, toggle, slider, dropdown, textbox, keybind, color picker, divider, and custom-content APIs.
-- Added window notifications, themes, custom accents, Reduce Motion, minimize/restore, resize, drag, hotkey show/hide, and cleanup.
-- Added `releases/library-v1.0.0.lua` for a pinned library build.
-- Added `examples/LibraryExample.lua`.
-- Kept the finished v3.6.2 full GUI in `latest.lua` unchanged.
+Premium/original-style library pass.
+
+### Library
+- Added `CreateOriginalWindow` / `CreatePremiumWindow`.
+- Added opt-in background blur with `SetBlurEnabled` and `SetBlurSize`.
+- Added animated glass and white rotating outer stroke treatment.
+- Upgraded tab switching to smooth fade + slide transitions.
+- Added one-shot page light sweep.
+- Added a Dynamic-Island-style temporary status API with `ShowStatus`.
+- Upgraded the minimized badge with a Lucide music icon.
+- Added size, position, and glass-transparency APIs.
+- Added responsive top context visibility for smaller window widths.
+
+### Reusable music player
+- Added `AddMusicPlayer` / `CreateMusicPlayer`.
+- Custom Roblox audio ID input only; no bundled song presets.
+- Play, pause, stop.
+- Repeat off / Repeat / Repeat 1.
+- Seek progress with a static thumb.
+- Volume slider with a static thumb.
+- Playback speed from 0.50x to 2.00x.
+- Dedicated heavy music blur and click-through input shield.
+- Top-bar Lucide music control and Ctrl+M toggle.
+- Full music/sound/blur cleanup on window destroy.
+
+### Examples
+- Added root `showcase.lua` for direct execution.
+- Replaced the basic library example with an original-style Home / Player / Settings / Visuals showcase.
+- Added live FPS / ping / session telemetry.
 
 ## v3.6.2 RC
 

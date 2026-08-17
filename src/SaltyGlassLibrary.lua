@@ -1,4 +1,4 @@
--- SaltyGlass UI Library v1.0.0
+-- SaltyGlass UI Library v1.1.0
 -- Reusable Roblox client UI library by MrRos3.
 --
 -- Stable raw URL:
@@ -12,6 +12,8 @@ local TweenService = game:GetService("TweenService")
 local TextService = game:GetService("TextService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
 
 local LocalPlayer = Players.LocalPlayer
 if not LocalPlayer then
@@ -21,7 +23,7 @@ end
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local SaltyGlass = {
-    Version = "1.0.0",
+    Version = "1.1.0",
     Name = "SaltyGlass",
 }
 
@@ -89,6 +91,9 @@ TabMethods.__index = TabMethods
 
 local ControlMethods = {}
 ControlMethods.__index = ControlMethods
+
+local MusicMethods = {}
+MusicMethods.__index = MusicMethods
 
 local function copyTable(source)
     local result = {}
@@ -211,6 +216,31 @@ local function normalizePosition(value)
     return UDim2.fromScale(0.5, 0.5)
 end
 
+local function normalizeAudioId(value)
+    local source = tostring(value or "")
+    local best = nil
+    for digits in string.gmatch(source, "%d+") do
+        if not best or #digits > #best then
+            best = digits
+        end
+    end
+    return best
+end
+
+local function formatClock(seconds)
+    local value = math.max(0, tonumber(seconds) or 0)
+    local minutes = math.floor(value / 60)
+    local secs = math.floor(value % 60)
+    return string.format("%d:%02d", minutes, secs)
+end
+
+local function keyName(key)
+    if typeof(key) == "EnumItem" then
+        return key.Name
+    end
+    return tostring(key or "")
+end
+
 local function safeCallback(callback, ...)
     if type(callback) ~= "function" then
         return true
@@ -308,9 +338,19 @@ function WindowMethods:_hover(frame, hitbox)
     end)
 end
 
-function WindowMethods:_setContext(tab)
+function WindowMethods:_renderContext(tab)
+    if not self._contextFrame then
+        return
+    end
+
     if not tab then
         self._contextText.Text = "READY"
+        self._contextText.TextColor3 = COLORS.SubText
+        self._contextText.Position = UDim2.fromOffset(32, 0)
+        self._contextText.Size = UDim2.new(1, -42, 1, 0)
+        if self._contextSub then
+            self._contextSub.Visible = false
+        end
         if self._contextIcon then
             self._contextIcon.Visible = false
         end
@@ -318,13 +358,104 @@ function WindowMethods:_setContext(tab)
     end
 
     self._contextText.Text = string.upper(tab.Name)
+    self._contextText.TextColor3 = COLORS.SubText
+    self._contextText.Position = UDim2.fromOffset(32, 0)
+    self._contextText.Size = UDim2.new(1, -42, 1, 0)
+    if self._contextSub then
+        self._contextSub.Visible = false
+    end
+
     local asset = SaltyGlass.Icons[tab.Icon or ""]
-    if asset then
+    if asset and self._contextIcon then
         self._contextIcon.Image = asset
         self._contextIcon.Visible = true
-    else
+    elseif self._contextIcon then
         self._contextIcon.Visible = false
     end
+end
+
+function WindowMethods:_setContext(tab)
+    self._contextTab = tab
+    if not self._statusActive then
+        self:_renderContext(tab)
+    end
+end
+
+function WindowMethods:ShowStatus(titleOrOptions, subtitle, duration, color)
+    if self._destroyed or not self._contextFrame or self._options.StatusIsland == false then
+        return
+    end
+
+    local options
+    if type(titleOrOptions) == "table" then
+        options = titleOrOptions
+    else
+        options = {
+            Title = titleOrOptions,
+            Subtitle = subtitle,
+            Duration = duration,
+            Color = color,
+        }
+    end
+
+    self._statusToken = (self._statusToken or 0) + 1
+    local token = self._statusToken
+    self._statusActive = true
+
+    local statusTitle = tostring(options.Title or "SALTY")
+    local statusSub = tostring(options.Subtitle or options.Message or "")
+    local statusColor = typeof(options.Color) == "Color3" and options.Color or self._accent
+    local statusIcon = options.Icon or "home"
+
+    if self._contextIcon then
+        local asset = SaltyGlass.Icons[statusIcon]
+        if asset then
+            self._contextIcon.Image = asset
+            self._contextIcon.ImageColor3 = statusColor
+            self._contextIcon.Visible = true
+        else
+            self._contextIcon.Visible = false
+        end
+    end
+
+    self._contextText.Text = statusTitle
+    self._contextText.TextColor3 = COLORS.Text
+    self._contextText.Position = UDim2.fromOffset(34, 3)
+    self._contextText.Size = UDim2.new(1, -44, 0, 15)
+
+    if self._contextSub then
+        self._contextSub.Text = statusSub
+        self._contextSub.Visible = statusSub ~= ""
+    end
+
+    local targetSize = UDim2.fromOffset(statusSub ~= "" and 206 or 174, statusSub ~= "" and 38 or 32)
+    if self._reduceMotion then
+        self._contextFrame.Size = targetSize
+    else
+        self:_tween(self._contextFrame, 0.16, { Size = targetSize })
+    end
+
+    task.delay(math.max(0.25, tonumber(options.Duration) or 1.6), function()
+        if self._destroyed or token ~= self._statusToken then
+            return
+        end
+
+        self._statusActive = false
+        if self._contextSub then
+            self._contextSub.Visible = false
+        end
+        if self._contextIcon then
+            self._contextIcon.ImageColor3 = self._accent
+        end
+
+        local normalSize = self._contextBaseSize or UDim2.fromOffset(138, 32)
+        if self._reduceMotion then
+            self._contextFrame.Size = normalSize
+        else
+            self:_tween(self._contextFrame, 0.15, { Size = normalSize })
+        end
+        self:_renderContext(self._contextTab or self._activeTab)
+    end)
 end
 
 function WindowMethods:_refreshTabs()
@@ -345,7 +476,6 @@ function WindowMethods:_refreshTabs()
                 ImageColor3 = iconColor,
             })
         end
-        tab._page.Visible = selected
     end
 end
 
@@ -374,23 +504,64 @@ function WindowMethods:SelectTab(tabOrName)
     local previous = self._activeTab
     self._activeTab = target
 
-    if previous and previous ~= target and not self._reduceMotion then
-        previous._page.Visible = true
-        self:_tween(previous._pageScale, 0.08, { Scale = 0.99 })
-        task.delay(0.08, function()
-            if not self._destroyed and self._activeTab ~= previous then
-                previous._page.Visible = false
-                previous._pageScale.Scale = 1
+    if previous and previous ~= target then
+        local previousGroup = previous._pageGroup or previous._page
+        previousGroup.Visible = true
+
+        if self._reduceMotion or self._options.SmoothTransitions == false then
+            previousGroup.Visible = false
+            if previous._pageGroup then
+                previous._pageGroup.GroupTransparency = 0
             end
-        end)
+            previous._page.Position = UDim2.fromOffset(0, 0)
+        else
+            if previous._pageGroup then
+                self:_tween(previous._pageGroup, 0.09, { GroupTransparency = 1 })
+            end
+            self:_tween(previous._page, 0.09, { Position = UDim2.fromOffset(0, -4) })
+            task.delay(0.095, function()
+                if not self._destroyed and self._activeTab ~= previous then
+                    previousGroup.Visible = false
+                    if previous._pageGroup then
+                        previous._pageGroup.GroupTransparency = 0
+                    end
+                    previous._page.Position = UDim2.fromOffset(0, 0)
+                end
+            end)
+        end
     end
 
-    target._page.Visible = true
-    if self._reduceMotion then
+    local targetGroup = target._pageGroup or target._page
+    targetGroup.Visible = true
+
+    if self._reduceMotion or self._options.SmoothTransitions == false then
+        if target._pageGroup then
+            target._pageGroup.GroupTransparency = 0
+        end
+        target._page.Position = UDim2.fromOffset(0, 0)
         target._pageScale.Scale = 1
     else
-        target._pageScale.Scale = 0.985
+        if target._pageGroup then
+            target._pageGroup.GroupTransparency = 1
+            self:_tween(target._pageGroup, 0.14, { GroupTransparency = 0 })
+        end
+        target._page.Position = UDim2.fromOffset(0, 6)
+        target._pageScale.Scale = 0.992
+        self:_tween(target._page, 0.14, { Position = UDim2.fromOffset(0, 0) })
         self:_tween(target._pageScale, 0.14, { Scale = 1 })
+
+        if self._pageSweep then
+            self._pageSweepToken = (self._pageSweepToken or 0) + 1
+            local sweepToken = self._pageSweepToken
+            self._pageSweep.Position = UDim2.new(-0.18, 0, 0, 0)
+            self._pageSweep.Visible = true
+            self:_tween(self._pageSweep, 0.20, { Position = UDim2.new(1.05, 0, 0, 0) }, Enum.EasingStyle.Sine)
+            task.delay(0.21, function()
+                if not self._destroyed and sweepToken == self._pageSweepToken and self._pageSweep then
+                    self._pageSweep.Visible = false
+                end
+            end)
+        end
     end
 
     self:_setContext(target)
@@ -462,8 +633,18 @@ function WindowMethods:AddTab(nameOrOptions, iconName)
     label.Size = UDim2.new(1, -(tabIcon and 46 or 24), 1, 0)
     label.ZIndex = 3
 
+    local pageGroup = make("CanvasGroup", {
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        GroupTransparency = 0,
+        Visible = false,
+        Parent = self._content,
+    })
+
     local page = make("ScrollingFrame", {
         Size = UDim2.fromScale(1, 1),
+        Position = UDim2.fromOffset(0, 0),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         ScrollBarThickness = 3,
@@ -471,8 +652,7 @@ function WindowMethods:AddTab(nameOrOptions, iconName)
         ScrollBarImageTransparency = 0.45,
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         CanvasSize = UDim2.new(),
-        Visible = false,
-        Parent = self._content,
+        Parent = pageGroup,
     })
     self:_bindAccent(page, "ScrollBarImageColor3")
     padding(page, 14, 14, 14, 16)
@@ -487,6 +667,7 @@ function WindowMethods:AddTab(nameOrOptions, iconName)
     tab._buttonFill = fill
     tab._buttonText = label
     tab._buttonIcon = tabIcon
+    tab._pageGroup = pageGroup
     tab._page = page
     tab._pageScale = pageScale
 
@@ -531,6 +712,9 @@ function WindowMethods:SetAccent(color)
     end
 
     self:_refreshTabs()
+    if self._music and not self._music._destroyed then
+        self._music:_refreshVisuals()
+    end
     return true
 end
 
@@ -556,11 +740,52 @@ end
 
 function WindowMethods:SetReduceMotion(enabled)
     self._reduceMotion = enabled == true
+    if self._backgroundBlur then
+        self:_applyBackgroundBlur()
+    end
+    if self._music and not self._music._destroyed then
+        self._music:_applyMotionState()
+    end
     return self._reduceMotion
 end
 
 function WindowMethods:GetReduceMotion()
     return self._reduceMotion
+end
+
+function WindowMethods:_applyBackgroundBlur()
+    if not self._backgroundBlur or not self._backgroundBlur.Parent then
+        return
+    end
+
+    local target = 0
+    if self._blurEnabled and not self._hidden and self._screen and self._screen.Enabled then
+        target = self._blurSize
+    end
+
+    if self._reduceMotion then
+        self._backgroundBlur.Size = target
+    else
+        self:_tween(self._backgroundBlur, 0.18, { Size = target })
+    end
+end
+
+function WindowMethods:SetBlurEnabled(enabled)
+    self._blurEnabled = enabled ~= false
+    self:_applyBackgroundBlur()
+    return self._blurEnabled
+end
+
+WindowMethods.SetBackgroundBlur = WindowMethods.SetBlurEnabled
+
+function WindowMethods:GetBlurEnabled()
+    return self._blurEnabled
+end
+
+function WindowMethods:SetBlurSize(size)
+    self._blurSize = math.clamp(tonumber(size) or self._blurSize or 16, 0, 56)
+    self:_applyBackgroundBlur()
+    return self._blurSize
 end
 
 function WindowMethods:SetTitle(title, subtitle)
@@ -591,14 +816,25 @@ function WindowMethods:Show()
     end
     self._screen.Enabled = true
     self._hidden = false
+    self:_applyBackgroundBlur()
 end
 
 function WindowMethods:Hide()
     if self._destroyed then
         return
     end
-    self._screen.Enabled = false
     self._hidden = true
+    if self._backgroundBlur then
+        if self._reduceMotion then
+            self._backgroundBlur.Size = 0
+        else
+            self:_tween(self._backgroundBlur, 0.14, { Size = 0 })
+        end
+    end
+    if self._music and not self._music._destroyed then
+        self._music:Close()
+    end
+    self._screen.Enabled = false
 end
 
 function WindowMethods:Toggle()
@@ -615,6 +851,7 @@ function WindowMethods:Minimize()
     end
 
     self._minimized = true
+    self:ShowStatus({ Title = "MINIMIZED", Subtitle = "Click badge to restore", Icon = "minus", Duration = 1.1 })
     self._badge.Position = self._main.Position
     self._badge.Visible = true
 
@@ -641,6 +878,7 @@ function WindowMethods:Restore()
 
     self._minimized = false
     self._main.Visible = true
+    self:ShowStatus({ Title = "RESTORED", Subtitle = "SaltyGlass is ready", Icon = "home", Duration = 1.0 })
     self._badge.Visible = false
 
     if self._reduceMotion then
@@ -734,6 +972,7 @@ function WindowMethods:ResetLayout()
 
     self:SetAccent(self._defaultAccent)
     self:SetReduceMotion(self._defaultReduceMotion)
+    self:SetBlurEnabled(self._defaultBlurEnabled)
     self:SetToggleKey(self._defaultToggleKey)
     self._main.Size = self._defaultSize
     self._main.Position = UDim2.fromScale(0.5, 0.5)
@@ -757,6 +996,43 @@ function WindowMethods:GetMainFrame()
     return self._main
 end
 
+function WindowMethods:SetSize(size)
+    if self._destroyed then
+        return false
+    end
+    local normalized = normalizeSize(size, nil)
+    if not normalized then
+        return false
+    end
+    self._main.Size = normalized
+    return true
+end
+
+function WindowMethods:GetSize()
+    return self._main.Size
+end
+
+function WindowMethods:SetPosition(position)
+    if self._destroyed then
+        return false
+    end
+    self._main.Position = normalizePosition(position)
+    return true
+end
+
+function WindowMethods:GetPosition()
+    return self._main.Position
+end
+
+function WindowMethods:SetWindowTransparency(value)
+    if self._destroyed then
+        return 0
+    end
+    local transparency = math.clamp(tonumber(value) or self._main.BackgroundTransparency, 0, 0.95)
+    self._main.BackgroundTransparency = transparency
+    return transparency
+end
+
 function WindowMethods:GetColors()
     local colors = copyTable(COLORS)
     colors.Accent = self._accent
@@ -772,6 +1048,10 @@ function WindowMethods:Destroy()
         return
     end
 
+    if self._music and not self._music._destroyed then
+        self._music:Destroy()
+    end
+
     self._destroyed = true
     for _, connection in ipairs(self._connections) do
         pcall(function()
@@ -780,9 +1060,972 @@ function WindowMethods:Destroy()
     end
     table.clear(self._connections)
 
+    if self._backgroundBlur and self._backgroundBlur.Parent then
+        self._backgroundBlur:Destroy()
+    end
+
     if self._screen and self._screen.Parent then
         self._screen:Destroy()
     end
+end
+
+
+local function setBarRatio(fill, thumb, ratio)
+    local clamped = math.clamp(tonumber(ratio) or 0, 0, 1)
+    if fill then
+        fill.Size = UDim2.new(clamped, 0, 1, 0)
+    end
+    if thumb then
+        thumb.Position = UDim2.new(clamped, 0, 0.5, 0)
+    end
+end
+
+function MusicMethods:_refreshVisuals()
+    if self._destroyed then
+        return
+    end
+
+    local ui = self._ui
+    local state = self._state
+    local accent = self._window._accent
+    local playing = self._sound and self._sound.IsPlaying
+
+    if ui.topIcon then
+        ui.topIcon.ImageColor3 = playing and accent or COLORS.SubText
+    end
+    if ui.playIcon then
+        ui.playIcon.Image = SaltyGlass.Icons[playing and "pause" or "play"]
+        ui.playIcon.ImageColor3 = playing and accent or COLORS.Text
+    end
+    if ui.repeatIcon then
+        ui.repeatIcon.ImageColor3 = state.repeatMode > 0 and accent or COLORS.SubText
+    end
+    if ui.repeatOne then
+        ui.repeatOne.Visible = state.repeatMode == 2
+        ui.repeatOne.BackgroundColor3 = accent
+    end
+    if ui.speedValue then
+        ui.speedValue.Text = string.format("%.2fx", state.speed)
+    end
+    if ui.volumeValue then
+        ui.volumeValue.Text = string.format("%d%%", math.floor(state.volume * 100 + 0.5))
+    end
+    if ui.idBox and state.audioId then
+        ui.idBox.Text = tostring(state.audioId)
+    end
+end
+
+function MusicMethods:_applyMotionState()
+    if self._destroyed then
+        return
+    end
+
+    if self._window._reduceMotion and self._ui.panelScale then
+        self._ui.panelScale.Scale = 1
+    end
+end
+
+function MusicMethods:SetAudioId(value, autoplay)
+    if self._destroyed then
+        return false
+    end
+
+    local audioId = normalizeAudioId(value)
+    if not audioId then
+        self._window:ShowStatus({
+            Title = "AUDIO ERROR",
+            Subtitle = "Enter a valid Roblox audio ID",
+            Icon = "music",
+            Color = COLORS.Danger,
+            Duration = 1.7,
+        })
+        return false
+    end
+
+    self._state.audioId = audioId
+    self._sound:Stop()
+    self._sound.TimePosition = 0
+    self._sound.SoundId = "rbxassetid://" .. audioId
+
+    if self._ui.idBox then
+        self._ui.idBox.Text = audioId
+    end
+    if self._ui.nowPlaying then
+        self._ui.nowPlaying.Text = "CUSTOM AUDIO • " .. audioId
+    end
+
+    self._window:ShowStatus({
+        Title = "AUDIO LOADED",
+        Subtitle = audioId,
+        Icon = "music",
+        Duration = 1.2,
+    })
+
+    if autoplay then
+        task.defer(function()
+            if not self._destroyed then
+                self:Play()
+            end
+        end)
+    end
+
+    return true
+end
+
+function MusicMethods:GetAudioId()
+    return self._state.audioId
+end
+
+function MusicMethods:Play()
+    if self._destroyed then
+        return false
+    end
+
+    if self._sound.SoundId == "" then
+        local value = self._ui.idBox and self._ui.idBox.Text or ""
+        if not self:SetAudioId(value, false) then
+            return false
+        end
+    end
+
+    self._sound.PlaybackSpeed = self._state.speed
+    self._sound.Volume = self._state.volume
+    self._sound.Looped = self._state.repeatMode > 0
+    self._sound:Play()
+    self:_refreshVisuals()
+
+    self._window:ShowStatus({
+        Title = "NOW PLAYING",
+        Subtitle = self._state.audioId and ("Audio " .. self._state.audioId) or "Custom audio",
+        Icon = "music",
+        Duration = 1.25,
+    })
+    return true
+end
+
+function MusicMethods:Pause()
+    if self._destroyed then
+        return
+    end
+    self._sound:Pause()
+    self:_refreshVisuals()
+    self._window:ShowStatus({
+        Title = "PAUSED",
+        Subtitle = "Custom audio",
+        Icon = "pause",
+        Duration = 1.0,
+    })
+end
+
+function MusicMethods:Stop()
+    if self._destroyed then
+        return
+    end
+    self._sound:Stop()
+    self._sound.TimePosition = 0
+    self:_refreshVisuals()
+    self._window:ShowStatus({
+        Title = "STOPPED",
+        Subtitle = "Playback reset",
+        Icon = "square",
+        Duration = 1.0,
+    })
+end
+
+function MusicMethods:SetVolume(value)
+    if self._destroyed then
+        return 0
+    end
+    self._state.volume = math.clamp(tonumber(value) or self._state.volume, 0, 1)
+    self._sound.Volume = self._state.volume
+    setBarRatio(self._ui.volumeFill, self._ui.volumeThumb, self._state.volume)
+    self:_refreshVisuals()
+    return self._state.volume
+end
+
+function MusicMethods:GetVolume()
+    return self._state.volume
+end
+
+function MusicMethods:SetSpeed(value, silent)
+    if self._destroyed then
+        return 1
+    end
+    self._state.speed = math.clamp(tonumber(value) or self._state.speed, 0.5, 2)
+    self._state.speed = math.floor(self._state.speed * 100 + 0.5) / 100
+    self._sound.PlaybackSpeed = self._state.speed
+    self:_refreshVisuals()
+    if not silent then
+        self._window:ShowStatus({
+            Title = "PLAYBACK SPEED",
+            Subtitle = string.format("%.2fx", self._state.speed),
+            Icon = "play",
+            Duration = 0.85,
+        })
+    end
+    return self._state.speed
+end
+
+function MusicMethods:GetSpeed()
+    return self._state.speed
+end
+
+function MusicMethods:SetRepeatMode(mode, silent)
+    if self._destroyed then
+        return 0
+    end
+
+    local value = mode
+    if type(mode) == "string" then
+        local lowered = string.lower(mode)
+        if lowered == "off" then
+            value = 0
+        elseif lowered == "one" or lowered == "repeat1" or lowered == "repeat 1" then
+            value = 2
+        else
+            value = 1
+        end
+    end
+
+    self._state.repeatMode = math.clamp(math.floor(tonumber(value) or 0), 0, 2)
+    self._sound.Looped = self._state.repeatMode > 0
+    self:_refreshVisuals()
+
+    local labels = {
+        [0] = "Repeat off",
+        [1] = "Repeat",
+        [2] = "Repeat 1",
+    }
+    if not silent then
+        self._window:ShowStatus({
+            Title = string.upper(labels[self._state.repeatMode]),
+            Subtitle = self._state.repeatMode == 0 and "Looping disabled" or "Looping enabled",
+            Icon = "repeat-2",
+            Duration = 0.9,
+        })
+    end
+    return self._state.repeatMode
+end
+
+function MusicMethods:GetRepeatMode()
+    return self._state.repeatMode
+end
+
+function MusicMethods:Open()
+    if self._destroyed or self._open then
+        return
+    end
+    self._open = true
+    self._ui.backdrop.Visible = true
+    self._ui.panel.Visible = true
+
+    if self._window._reduceMotion then
+        self._ui.backdrop.BackgroundTransparency = 0.28
+        self._ui.panelScale.Scale = 1
+        self._musicBlur.Size = self._options.MusicBlurSize
+    else
+        self._ui.backdrop.BackgroundTransparency = 1
+        self._ui.panelScale.Scale = 0.965
+        self._window:_tween(self._ui.backdrop, 0.16, { BackgroundTransparency = 0.28 })
+        self._window:_tween(self._ui.panelScale, 0.18, { Scale = 1 })
+        self._window:_tween(self._musicBlur, 0.18, { Size = self._options.MusicBlurSize })
+    end
+
+    self._window:ShowStatus({
+        Title = "MUSIC PLAYER",
+        Subtitle = "Custom Roblox audio",
+        Icon = "music",
+        Duration = 1.0,
+    })
+end
+
+function MusicMethods:Close()
+    if self._destroyed or not self._open then
+        return
+    end
+    self._open = false
+
+    if self._window._reduceMotion then
+        self._musicBlur.Size = 0
+        self._ui.backdrop.Visible = false
+        self._ui.panel.Visible = false
+        self._ui.backdrop.BackgroundTransparency = 1
+        self._ui.panelScale.Scale = 1
+    else
+        self._window:_tween(self._musicBlur, 0.15, { Size = 0 })
+        self._window:_tween(self._ui.backdrop, 0.13, { BackgroundTransparency = 1 })
+        self._window:_tween(self._ui.panelScale, 0.13, { Scale = 0.97 })
+        task.delay(0.14, function()
+            if not self._destroyed and not self._open then
+                self._ui.backdrop.Visible = false
+                self._ui.panel.Visible = false
+                self._ui.panelScale.Scale = 1
+            end
+        end)
+    end
+end
+
+function MusicMethods:Toggle()
+    if self._open then
+        self:Close()
+    else
+        self:Open()
+    end
+end
+
+function MusicMethods:IsOpen()
+    return self._open
+end
+
+function MusicMethods:GetSound()
+    return self._sound
+end
+
+function MusicMethods:Destroy()
+    if self._destroyed then
+        return
+    end
+    self._destroyed = true
+    self._open = false
+
+    if self._sound and self._sound.Parent then
+        self._sound:Stop()
+        self._sound:Destroy()
+    end
+    if self._musicBlur and self._musicBlur.Parent then
+        self._musicBlur:Destroy()
+    end
+    if self._ui and self._ui.backdrop and self._ui.backdrop.Parent then
+        self._ui.backdrop:Destroy()
+    end
+    if self._ui and self._ui.topButton and self._ui.topButton.Parent then
+        self._ui.topButton:Destroy()
+    end
+    if self._window and self._window._music == self then
+        self._window._music = nil
+    end
+end
+
+function WindowMethods:AddMusicPlayer(options)
+    if self._destroyed then
+        return nil
+    end
+    if self._music and not self._music._destroyed then
+        return self._music
+    end
+
+    options = merge({
+        Title = "Custom Audio",
+        Subtitle = "ROBLOX AUDIO ID",
+        Volume = 0.55,
+        Speed = 1,
+        RepeatMode = 0,
+        MusicBlurSize = 30,
+        Hotkey = Enum.KeyCode.M,
+        RequireControl = true,
+    }, options or {})
+
+    local music = setmetatable({
+        _window = self,
+        _options = options,
+        _ui = {},
+        _state = {
+            audioId = nil,
+            volume = math.clamp(tonumber(options.Volume) or 0.55, 0, 1),
+            speed = math.clamp(tonumber(options.Speed) or 1, 0.5, 2),
+            repeatMode = math.clamp(math.floor(tonumber(options.RepeatMode) or 0), 0, 2),
+            draggingProgress = false,
+            draggingVolume = false,
+        },
+        _destroyed = false,
+        _open = false,
+    }, MusicMethods)
+    self._music = music
+
+    local ui = music._ui
+    local state = music._state
+    local screen = self._screen
+    local topbar = self._topbar
+
+    local blurName = tostring(self._options.Name) .. "_MusicBlur"
+    local oldBlur = Lighting:FindFirstChild(blurName)
+    if oldBlur then
+        oldBlur:Destroy()
+    end
+    music._musicBlur = make("BlurEffect", {
+        Name = blurName,
+        Size = 0,
+        Parent = Lighting,
+    })
+
+    music._sound = make("Sound", {
+        Name = tostring(self._options.Name) .. "_Music",
+        Volume = state.volume,
+        PlaybackSpeed = state.speed,
+        Looped = state.repeatMode > 0,
+        Parent = SoundService,
+    })
+
+    ui.topButton = make("TextButton", {
+        Name = "MusicButton",
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -91, 0.5, 0),
+        Size = UDim2.fromOffset(30, 30),
+        BackgroundTransparency = 1,
+        AutoButtonColor = false,
+        Text = "",
+        ZIndex = 6,
+        Parent = topbar,
+    })
+    ui.topIcon = icon(ui.topButton, "music", 15, COLORS.SubText, 7)
+    ui.topIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+    ui.topIcon.Position = UDim2.fromScale(0.5, 0.5)
+
+    if self._contextFrame then
+        self._contextRightOffset = 130
+        self._contextFrame.Position = UDim2.new(1, -130, 0.5, 0)
+    end
+
+    ui.backdrop = make("TextButton", {
+        Name = "MusicBackdropInputSink",
+        Size = UDim2.fromScale(1, 1),
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        BackgroundTransparency = 1,
+        AutoButtonColor = false,
+        Text = "",
+        Visible = false,
+        ZIndex = 200,
+        Parent = screen,
+    })
+
+    ui.panel = make("Frame", {
+        Name = "MusicPalette",
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(500, 352),
+        BackgroundColor3 = COLORS.GlassBase,
+        BackgroundTransparency = 0.08,
+        BorderSizePixel = 0,
+        ClipsDescendants = true,
+        Visible = false,
+        ZIndex = 210,
+        Parent = screen,
+    })
+    round(ui.panel, 24)
+    stroke(ui.panel, 1.4, 0.42)
+    ui.panelScale = make("UIScale", { Scale = 1, Parent = ui.panel })
+
+    ui.panelGradient = make("UIGradient", {
+        Rotation = 52,
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(39, 50, 80)),
+            ColorSequenceKeypoint.new(0.42, COLORS.GlassMid),
+            ColorSequenceKeypoint.new(1, COLORS.GlassBase),
+        }),
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.18),
+            NumberSequenceKeypoint.new(0.52, 0.52),
+            NumberSequenceKeypoint.new(1, 0.80),
+        }),
+        Parent = ui.panel,
+    })
+
+    task.spawn(function()
+        while not music._destroyed and ui.panelGradient.Parent do
+            if self._reduceMotion then
+                ui.panelGradient.Rotation = 52
+                task.wait(0.25)
+            else
+                self:_tween(ui.panelGradient, 6.5, { Rotation = 70 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                task.wait(6.5)
+                if not music._destroyed and ui.panelGradient.Parent and not self._reduceMotion then
+                    self:_tween(ui.panelGradient, 6.5, { Rotation = 36 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                    task.wait(6.5)
+                end
+            end
+        end
+    end)
+
+    ui.inputShield = make("TextButton", {
+        Name = "PaletteInputShield",
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
+        AutoButtonColor = false,
+        Text = "",
+        ZIndex = 211,
+        Parent = ui.panel,
+    })
+
+    ui.headerIcon = icon(ui.panel, "music", 18, self._accent, 214)
+    ui.headerIcon.Position = UDim2.fromOffset(20, 18)
+    self:_bindAccent(ui.headerIcon, "ImageColor3")
+
+    ui.title = textLabel(ui.panel, tostring(options.Title), 14, COLORS.Text, Enum.Font.GothamBold)
+    ui.title.Position = UDim2.fromOffset(50, 13)
+    ui.title.Size = UDim2.new(1, -110, 0, 24)
+    ui.title.ZIndex = 214
+
+    ui.subtitle = textLabel(ui.panel, tostring(options.Subtitle), 8, COLORS.SubText, Enum.Font.GothamBold)
+    ui.subtitle.Position = UDim2.fromOffset(51, 35)
+    ui.subtitle.Size = UDim2.new(1, -112, 0, 16)
+    ui.subtitle.ZIndex = 214
+
+    ui.close = make("TextButton", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -18, 0, 31),
+        Size = UDim2.fromOffset(30, 30),
+        BackgroundTransparency = 1,
+        AutoButtonColor = false,
+        Text = "",
+        ZIndex = 216,
+        Parent = ui.panel,
+    })
+    ui.closeIcon = icon(ui.close, "x", 14, COLORS.SubText, 217)
+    ui.closeIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+    ui.closeIcon.Position = UDim2.fromScale(0.5, 0.5)
+
+    ui.headerLine = make("Frame", {
+        Position = UDim2.fromOffset(18, 61),
+        Size = UDim2.new(1, -36, 0, 1),
+        BackgroundColor3 = COLORS.Edge,
+        BackgroundTransparency = 0.88,
+        BorderSizePixel = 0,
+        ZIndex = 213,
+        Parent = ui.panel,
+    })
+
+    ui.idHolder = make("Frame", {
+        Position = UDim2.fromOffset(18, 78),
+        Size = UDim2.new(1, -134, 0, 38),
+        BackgroundColor3 = COLORS.GlassLight,
+        BackgroundTransparency = 0.58,
+        BorderSizePixel = 0,
+        ZIndex = 213,
+        Parent = ui.panel,
+    })
+    round(ui.idHolder, 10)
+    stroke(ui.idHolder, 1, 0.76)
+
+    ui.idBox = make("TextBox", {
+        Position = UDim2.fromOffset(12, 0),
+        Size = UDim2.new(1, -24, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+        PlaceholderText = "Paste Roblox audio ID...",
+        PlaceholderColor3 = COLORS.Muted,
+        TextColor3 = COLORS.Text,
+        TextSize = 10,
+        Font = Enum.Font.GothamMedium,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ClearTextOnFocus = false,
+        ZIndex = 216,
+        Parent = ui.idHolder,
+    })
+
+    ui.loadButton = make("TextButton", {
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, -18, 0, 78),
+        Size = UDim2.fromOffset(104, 38),
+        BackgroundColor3 = self._accent,
+        BackgroundTransparency = 0.70,
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Text = "LOAD + PLAY",
+        TextColor3 = COLORS.Text,
+        TextSize = 8,
+        Font = Enum.Font.GothamBold,
+        ZIndex = 216,
+        Parent = ui.panel,
+    })
+    round(ui.loadButton, 10)
+    stroke(ui.loadButton, 1, 0.60)
+    self:_bindAccent(ui.loadButton)
+
+    ui.nowPlaying = textLabel(ui.panel, "CUSTOM AUDIO • READY", 8, COLORS.SubText, Enum.Font.GothamBold)
+    ui.nowPlaying.Position = UDim2.fromOffset(20, 126)
+    ui.nowPlaying.Size = UDim2.new(1, -40, 0, 17)
+    ui.nowPlaying.ZIndex = 214
+
+    ui.play = make("TextButton", {
+        Position = UDim2.fromOffset(20, 151),
+        Size = UDim2.fromOffset(40, 40),
+        BackgroundColor3 = self._accent,
+        BackgroundTransparency = 0.72,
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Text = "",
+        ZIndex = 216,
+        Parent = ui.panel,
+    })
+    round(ui.play, 12)
+    stroke(ui.play, 1, 0.62)
+    self:_bindAccent(ui.play)
+    ui.playIcon = icon(ui.play, "play", 16, COLORS.Text, 217)
+    ui.playIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+    ui.playIcon.Position = UDim2.fromScale(0.5, 0.5)
+
+    ui.stop = make("TextButton", {
+        Position = UDim2.fromOffset(68, 151),
+        Size = UDim2.fromOffset(40, 40),
+        BackgroundColor3 = COLORS.GlassLight,
+        BackgroundTransparency = 0.62,
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Text = "",
+        ZIndex = 216,
+        Parent = ui.panel,
+    })
+    round(ui.stop, 12)
+    stroke(ui.stop, 1, 0.70)
+    ui.stopIcon = icon(ui.stop, "square", 14, COLORS.SubText, 217)
+    ui.stopIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+    ui.stopIcon.Position = UDim2.fromScale(0.5, 0.5)
+
+    ui.repeatButton = make("TextButton", {
+        Position = UDim2.fromOffset(116, 151),
+        Size = UDim2.fromOffset(40, 40),
+        BackgroundColor3 = COLORS.GlassLight,
+        BackgroundTransparency = 0.62,
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Text = "",
+        ZIndex = 216,
+        Parent = ui.panel,
+    })
+    round(ui.repeatButton, 12)
+    stroke(ui.repeatButton, 1, 0.70)
+    ui.repeatIcon = icon(ui.repeatButton, "repeat-2", 15, COLORS.SubText, 217)
+    ui.repeatIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+    ui.repeatIcon.Position = UDim2.fromScale(0.5, 0.5)
+
+    ui.repeatOne = make("TextLabel", {
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, 1, 0, -2),
+        Size = UDim2.fromOffset(14, 14),
+        BackgroundColor3 = self._accent,
+        BorderSizePixel = 0,
+        Text = "1",
+        TextColor3 = COLORS.Text,
+        TextSize = 7,
+        Font = Enum.Font.GothamBold,
+        Visible = false,
+        ZIndex = 218,
+        Parent = ui.repeatButton,
+    })
+    round(ui.repeatOne, 7)
+    self:_bindAccent(ui.repeatOne)
+
+    ui.currentTime = textLabel(ui.panel, "0:00", 8, COLORS.SubText, Enum.Font.GothamBold)
+    ui.currentTime.Position = UDim2.fromOffset(174, 151)
+    ui.currentTime.Size = UDim2.fromOffset(38, 20)
+    ui.currentTime.ZIndex = 214
+
+    ui.totalTime = textLabel(ui.panel, "0:00", 8, COLORS.SubText, Enum.Font.GothamBold, Enum.TextXAlignment.Right)
+    ui.totalTime.AnchorPoint = Vector2.new(1, 0)
+    ui.totalTime.Position = UDim2.new(1, -20, 0, 151)
+    ui.totalTime.Size = UDim2.fromOffset(44, 20)
+    ui.totalTime.ZIndex = 214
+
+    ui.progress = make("TextButton", {
+        Position = UDim2.fromOffset(174, 177),
+        Size = UDim2.new(1, -194, 0, 6),
+        BackgroundColor3 = COLORS.GlassLight,
+        BackgroundTransparency = 0.46,
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Text = "",
+        ZIndex = 216,
+        Parent = ui.panel,
+    })
+    round(ui.progress, 3)
+
+    ui.progressFill = make("Frame", {
+        Size = UDim2.new(0, 0, 1, 0),
+        BackgroundColor3 = self._accent,
+        BorderSizePixel = 0,
+        ZIndex = 217,
+        Parent = ui.progress,
+    })
+    round(ui.progressFill, 3)
+    self:_bindAccent(ui.progressFill)
+
+    ui.progressThumb = make("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0, 0, 0.5, 0),
+        Size = UDim2.fromOffset(10, 10),
+        BackgroundColor3 = COLORS.Text,
+        BorderSizePixel = 0,
+        ZIndex = 218,
+        Parent = ui.progress,
+    })
+    round(ui.progressThumb, 5)
+
+    ui.volumeIcon = icon(ui.panel, "volume-2", 14, COLORS.SubText, 214)
+    ui.volumeIcon.Position = UDim2.fromOffset(20, 214)
+
+    ui.volume = make("TextButton", {
+        Position = UDim2.fromOffset(46, 219),
+        Size = UDim2.fromOffset(180, 6),
+        BackgroundColor3 = COLORS.GlassLight,
+        BackgroundTransparency = 0.46,
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Text = "",
+        ZIndex = 216,
+        Parent = ui.panel,
+    })
+    round(ui.volume, 3)
+
+    ui.volumeFill = make("Frame", {
+        Size = UDim2.new(state.volume, 0, 1, 0),
+        BackgroundColor3 = self._accent,
+        BorderSizePixel = 0,
+        ZIndex = 217,
+        Parent = ui.volume,
+    })
+    round(ui.volumeFill, 3)
+    self:_bindAccent(ui.volumeFill)
+
+    ui.volumeThumb = make("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(state.volume, 0, 0.5, 0),
+        Size = UDim2.fromOffset(12, 12),
+        BackgroundColor3 = COLORS.Text,
+        BorderSizePixel = 0,
+        ZIndex = 218,
+        Parent = ui.volume,
+    })
+    round(ui.volumeThumb, 6)
+
+    ui.volumeValue = textLabel(ui.panel, "", 8, COLORS.SubText, Enum.Font.GothamBold)
+    ui.volumeValue.Position = UDim2.fromOffset(238, 209)
+    ui.volumeValue.Size = UDim2.fromOffset(44, 24)
+    ui.volumeValue.ZIndex = 214
+
+    ui.speedLabel = textLabel(ui.panel, "PLAYBACK SPEED", 8, COLORS.SubText, Enum.Font.GothamBold)
+    ui.speedLabel.Position = UDim2.fromOffset(20, 251)
+    ui.speedLabel.Size = UDim2.fromOffset(120, 18)
+    ui.speedLabel.ZIndex = 214
+
+    ui.speedMinus = make("TextButton", {
+        Position = UDim2.fromOffset(20, 277),
+        Size = UDim2.fromOffset(34, 30),
+        BackgroundColor3 = COLORS.GlassLight,
+        BackgroundTransparency = 0.58,
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Text = "−",
+        TextColor3 = COLORS.Text,
+        TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        ZIndex = 216,
+        Parent = ui.panel,
+    })
+    round(ui.speedMinus, 9)
+    stroke(ui.speedMinus, 1, 0.72)
+
+    ui.speedValue = make("TextButton", {
+        Position = UDim2.fromOffset(62, 277),
+        Size = UDim2.fromOffset(70, 30),
+        BackgroundColor3 = COLORS.GlassLight,
+        BackgroundTransparency = 0.58,
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Text = "1.00x",
+        TextColor3 = COLORS.Text,
+        TextSize = 9,
+        Font = Enum.Font.GothamBold,
+        ZIndex = 216,
+        Parent = ui.panel,
+    })
+    round(ui.speedValue, 9)
+    stroke(ui.speedValue, 1, 0.72)
+
+    ui.speedPlus = make("TextButton", {
+        Position = UDim2.fromOffset(140, 277),
+        Size = UDim2.fromOffset(34, 30),
+        BackgroundColor3 = COLORS.GlassLight,
+        BackgroundTransparency = 0.58,
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Text = "+",
+        TextColor3 = COLORS.Text,
+        TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        ZIndex = 216,
+        Parent = ui.panel,
+    })
+    round(ui.speedPlus, 9)
+    stroke(ui.speedPlus, 1, 0.72)
+
+    ui.help = textLabel(ui.panel, "Only use Roblox audio assets you have permission to play.", 8, COLORS.Muted, Enum.Font.Gotham)
+    ui.help.AnchorPoint = Vector2.new(1, 0)
+    ui.help.Position = UDim2.new(1, -20, 0, 262)
+    ui.help.Size = UDim2.fromOffset(250, 48)
+    ui.help.TextWrapped = true
+    ui.help.TextXAlignment = Enum.TextXAlignment.Right
+    ui.help.ZIndex = 214
+
+    local function ratioFromInput(bar, input)
+        local width = math.max(1, bar.AbsoluteSize.X)
+        return math.clamp((input.Position.X - bar.AbsolutePosition.X) / width, 0, 1)
+    end
+
+    local function updateProgressFromInput(input)
+        local length = music._sound.TimeLength
+        if length > 0 then
+            local ratio = ratioFromInput(ui.progress, input)
+            music._sound.TimePosition = math.clamp(length * ratio, 0, math.max(0, length - 0.01))
+            setBarRatio(ui.progressFill, ui.progressThumb, ratio)
+        end
+    end
+
+    local function updateVolumeFromInput(input)
+        music:SetVolume(ratioFromInput(ui.volume, input))
+    end
+
+    self:_connect(ui.topButton.MouseButton1Click, function()
+        music:Toggle()
+    end)
+    self:_connect(ui.topButton.MouseEnter, function()
+        if not music._sound.IsPlaying then
+            self:_tween(ui.topIcon, 0.10, { ImageColor3 = self._accent })
+        end
+    end)
+    self:_connect(ui.topButton.MouseLeave, function()
+        music:_refreshVisuals()
+    end)
+    self:_connect(ui.close.MouseButton1Click, function()
+        music:Close()
+    end)
+    self:_connect(ui.close.MouseEnter, function()
+        self:_tween(ui.closeIcon, 0.10, { ImageColor3 = COLORS.Danger })
+    end)
+    self:_connect(ui.close.MouseLeave, function()
+        self:_tween(ui.closeIcon, 0.10, { ImageColor3 = COLORS.SubText })
+    end)
+
+    self:_connect(ui.loadButton.MouseButton1Click, function()
+        music:SetAudioId(ui.idBox.Text, true)
+    end)
+    self:_connect(ui.idBox.FocusLost, function(enterPressed)
+        if enterPressed then
+            music:SetAudioId(ui.idBox.Text, true)
+        end
+    end)
+
+    self:_connect(ui.play.MouseButton1Click, function()
+        if music._sound.IsPlaying then
+            music:Pause()
+        else
+            music:Play()
+        end
+    end)
+    self:_connect(ui.stop.MouseButton1Click, function()
+        music:Stop()
+    end)
+    self:_connect(ui.repeatButton.MouseButton1Click, function()
+        music:SetRepeatMode((state.repeatMode + 1) % 3)
+    end)
+
+    self:_connect(ui.speedMinus.MouseButton1Click, function()
+        music:SetSpeed(state.speed - 0.10)
+    end)
+    self:_connect(ui.speedPlus.MouseButton1Click, function()
+        music:SetSpeed(state.speed + 0.10)
+    end)
+    self:_connect(ui.speedValue.MouseButton1Click, function()
+        music:SetSpeed(1)
+    end)
+
+    self:_connect(ui.progress.InputBegan, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            state.draggingProgress = true
+            updateProgressFromInput(input)
+        end
+    end)
+
+    self:_connect(ui.volume.InputBegan, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            state.draggingVolume = true
+            updateVolumeFromInput(input)
+        end
+    end)
+
+    self:_connect(UserInputService.InputChanged, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            if state.draggingProgress then
+                updateProgressFromInput(input)
+            end
+            if state.draggingVolume then
+                updateVolumeFromInput(input)
+            end
+        end
+    end)
+
+    self:_connect(UserInputService.InputEnded, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            state.draggingProgress = false
+            state.draggingVolume = false
+        end
+    end)
+
+    self:_connect(music._sound.Played, function()
+        music:_refreshVisuals()
+    end)
+    self:_connect(music._sound.Paused, function()
+        music:_refreshVisuals()
+    end)
+    self:_connect(music._sound.Ended, function()
+        music:_refreshVisuals()
+        if state.repeatMode == 0 then
+            setBarRatio(ui.progressFill, ui.progressThumb, 0)
+        end
+    end)
+
+    self:_connect(RunService.RenderStepped, function()
+        if music._destroyed then
+            return
+        end
+
+        local length = music._sound.TimeLength
+        local position = music._sound.TimePosition
+        ui.currentTime.Text = formatClock(position)
+        ui.totalTime.Text = formatClock(length)
+
+        if not state.draggingProgress and length > 0 then
+            setBarRatio(ui.progressFill, ui.progressThumb, position / length)
+        elseif not state.draggingProgress then
+            setBarRatio(ui.progressFill, ui.progressThumb, 0)
+        end
+    end)
+
+    self:_connect(UserInputService.InputBegan, function(input, gameProcessed)
+        if gameProcessed or input.UserInputType ~= Enum.UserInputType.Keyboard then
+            return
+        end
+
+        if input.KeyCode == options.Hotkey then
+            local controlDown = UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
+                or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)
+
+            if options.RequireControl == false or controlDown then
+                music:Toggle()
+            end
+        end
+    end)
+
+    music:SetVolume(state.volume)
+    music:SetSpeed(state.speed, true)
+    music:SetRepeatMode(state.repeatMode, true)
+    music:_refreshVisuals()
+    return music
+end
+
+WindowMethods.CreateMusicPlayer = WindowMethods.AddMusicPlayer
+
+function WindowMethods:GetMusicPlayer()
+    return self._music
 end
 
 local function buildTitleBlock(window, card, options, rightInset)
@@ -1784,6 +3027,11 @@ function SaltyGlass:CreateWindow(options)
         MaxSize = DEFAULTS.MaxSize,
         ToggleKey = DEFAULTS.ToggleKey,
         ReduceMotion = DEFAULTS.ReduceMotion,
+        BackgroundBlur = true,
+        BlurSize = 16,
+        SmoothTransitions = true,
+        StatusIsland = true,
+        MusicPlayer = false,
         CleanupExisting = true,
         CloseBehavior = "Destroy",
         Parent = PlayerGui,
@@ -1799,8 +3047,14 @@ function SaltyGlass:CreateWindow(options)
     window._accent = typeof(window._options.Accent) == "Color3" and window._options.Accent or DEFAULTS.Accent
     window._reduceMotion = window._options.ReduceMotion == true
     window._toggleKey = typeof(window._options.ToggleKey) == "EnumItem" and window._options.ToggleKey or DEFAULTS.ToggleKey
+    window._blurEnabled = window._options.BackgroundBlur ~= false
+    window._blurSize = math.clamp(tonumber(window._options.BlurSize) or 16, 0, 56)
+    window._statusToken = 0
+    window._statusActive = false
+    window._pageSweepToken = 0
     window._defaultAccent = window._accent
     window._defaultReduceMotion = window._reduceMotion
+    window._defaultBlurEnabled = window._blurEnabled
     window._defaultToggleKey = window._toggleKey
     window._defaultSize = normalizeSize(window._options.Size, DEFAULTS.Size)
     window._minSize = typeof(window._options.MinSize) == "Vector2" and window._options.MinSize or DEFAULTS.MinSize
@@ -1829,6 +3083,18 @@ function SaltyGlass:CreateWindow(options)
     })
     window._screen = screen
 
+    local backgroundBlurName = screenName .. "_BackgroundBlur"
+    local oldBackgroundBlur = Lighting:FindFirstChild(backgroundBlurName)
+    if oldBackgroundBlur then
+        oldBackgroundBlur:Destroy()
+    end
+
+    window._backgroundBlur = make("BlurEffect", {
+        Name = backgroundBlurName,
+        Size = 0,
+        Parent = Lighting,
+    })
+
     local main = make("Frame", {
         Name = "MainFrame",
         AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1842,6 +3108,15 @@ function SaltyGlass:CreateWindow(options)
     })
     round(main, 26)
     local mainStroke = stroke(main, 1.4, 0.48)
+    local mainStrokeGradient = make("UIGradient", {
+        Rotation = 20,
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, COLORS.Edge),
+            ColorSequenceKeypoint.new(0.5, COLORS.Edge),
+            ColorSequenceKeypoint.new(1, COLORS.Edge),
+        }),
+        Parent = mainStroke,
+    })
     local mainScale = make("UIScale", { Scale = 1, Parent = main })
     window._main = main
     window._mainScale = mainScale
@@ -1861,6 +3136,37 @@ function SaltyGlass:CreateWindow(options)
         }),
         Parent = main,
     })
+
+    task.spawn(function()
+        while not window._destroyed and gradient.Parent do
+            if window._reduceMotion then
+                gradient.Rotation = 55
+                task.wait(0.25)
+            else
+                window:_tween(gradient, 7.5, { Rotation = 74 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                task.wait(7.5)
+                if not window._destroyed and gradient.Parent and not window._reduceMotion then
+                    window:_tween(gradient, 7.5, { Rotation = 38 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                    task.wait(7.5)
+                end
+            end
+        end
+    end)
+
+    task.spawn(function()
+        while not window._destroyed and mainStrokeGradient.Parent do
+            if window._reduceMotion then
+                mainStrokeGradient.Rotation = 20
+                task.wait(0.25)
+            else
+                window:_tween(mainStrokeGradient, 8, { Rotation = 380 }, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+                task.wait(8)
+                if mainStrokeGradient.Parent then
+                    mainStrokeGradient.Rotation = 20
+                end
+            end
+        end
+    end)
 
     local inner = make("Frame", {
         Position = UDim2.fromOffset(1, 1),
@@ -1888,6 +3194,7 @@ function SaltyGlass:CreateWindow(options)
         BorderSizePixel = 0,
         Parent = main,
     })
+    window._topbar = topbar
 
     local title = textLabel(topbar, tostring(window._options.Title), 15, COLORS.Text, Enum.Font.GothamBold)
     title.Position = UDim2.fromOffset(20, 12)
@@ -1921,6 +3228,9 @@ function SaltyGlass:CreateWindow(options)
     })
     round(context, 11)
     stroke(context, 1, 0.78)
+    window._contextFrame = context
+    window._contextBaseSize = UDim2.fromOffset(138, 32)
+    window._contextRightOffset = 100
 
     local contextIcon = icon(context, "home", 13, window._accent, 4)
     contextIcon.AnchorPoint = Vector2.new(0, 0.5)
@@ -1934,6 +3244,13 @@ function SaltyGlass:CreateWindow(options)
     contextText.Size = UDim2.new(1, -42, 1, 0)
     contextText.TextTruncate = Enum.TextTruncate.AtEnd
     window._contextText = contextText
+
+    local contextSub = textLabel(context, "", 7, COLORS.SubText, Enum.Font.Gotham)
+    contextSub.Position = UDim2.fromOffset(34, 18)
+    contextSub.Size = UDim2.new(1, -44, 0, 13)
+    contextSub.TextTruncate = Enum.TextTruncate.AtEnd
+    contextSub.Visible = false
+    window._contextSub = contextSub
 
     local minimizeButton = make("TextButton", {
         AnchorPoint = Vector2.new(1, 0.5),
@@ -2001,6 +3318,28 @@ function SaltyGlass:CreateWindow(options)
     })
     window._content = content
 
+    local pageSweep = make("Frame", {
+        Position = UDim2.new(-0.18, 0, 0, 0),
+        Size = UDim2.fromOffset(74, 560),
+        BackgroundColor3 = COLORS.Edge,
+        BackgroundTransparency = 0.94,
+        BorderSizePixel = 0,
+        Rotation = 12,
+        Visible = false,
+        ZIndex = 80,
+        Parent = content,
+    })
+    local pageSweepGradient = make("UIGradient", {
+        Rotation = 0,
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.5, 0.42),
+            NumberSequenceKeypoint.new(1, 1),
+        }),
+        Parent = pageSweep,
+    })
+    window._pageSweep = pageSweep
+
     local resizeHandle = make("TextButton", {
         Name = "ResizeHandle",
         AnchorPoint = Vector2.new(1, 1),
@@ -2036,25 +3375,31 @@ function SaltyGlass:CreateWindow(options)
     window._badge = badge
     window._badgeScale = badgeScale
 
-    local badgeDot = make("Frame", {
+    local badgeIconHolder = make("Frame", {
         AnchorPoint = Vector2.new(0, 0.5),
-        Position = UDim2.new(0, 14, 0.5, 0),
-        Size = UDim2.fromOffset(9, 9),
+        Position = UDim2.new(0, 10, 0.5, 0),
+        Size = UDim2.fromOffset(22, 22),
         BackgroundColor3 = window._accent,
+        BackgroundTransparency = 0.80,
         BorderSizePixel = 0,
         Parent = badge,
     })
-    round(badgeDot, 5)
-    window:_bindAccent(badgeDot)
+    round(badgeIconHolder, 8)
+    stroke(badgeIconHolder, 1, 0.74)
+    window:_bindAccent(badgeIconHolder)
+
+    local badgeMusicIcon = icon(badgeIconHolder, "music", 13, COLORS.Text, 3)
+    badgeMusicIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+    badgeMusicIcon.Position = UDim2.fromScale(0.5, 0.5)
 
     local badgeTitle = textLabel(badge, tostring(window._options.Title), 10, COLORS.Text, Enum.Font.GothamBold)
-    badgeTitle.Position = UDim2.fromOffset(34, 6)
-    badgeTitle.Size = UDim2.new(1, -44, 0, 20)
+    badgeTitle.Position = UDim2.fromOffset(40, 6)
+    badgeTitle.Size = UDim2.new(1, -50, 0, 20)
     badgeTitle.TextTruncate = Enum.TextTruncate.AtEnd
 
     local badgeSub = textLabel(badge, "MINIMIZED • RESTORE", 7, COLORS.SubText, Enum.Font.GothamBold)
-    badgeSub.Position = UDim2.fromOffset(34, 25)
-    badgeSub.Size = UDim2.new(1, -44, 0, 16)
+    badgeSub.Position = UDim2.fromOffset(40, 25)
+    badgeSub.Size = UDim2.new(1, -50, 0, 16)
 
     local notifications = make("Frame", {
         AnchorPoint = Vector2.new(1, 1),
@@ -2067,6 +3412,18 @@ function SaltyGlass:CreateWindow(options)
     local notificationLayout = listLayout(notifications, 8)
     notificationLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
     window._notifications = notifications
+
+    local function updateResponsiveHeader()
+        if window._destroyed then
+            return
+        end
+        if window._contextFrame then
+            window._contextFrame.Visible = main.AbsoluteSize.X >= 560
+        end
+    end
+
+    window:_connect(main:GetPropertyChangedSignal("AbsoluteSize"), updateResponsiveHeader)
+    task.defer(updateResponsiveHeader)
 
     window:_connect(minimizeButton.MouseButton1Click, function()
         window:Minimize()
@@ -2191,6 +3548,25 @@ function SaltyGlass:CreateWindow(options)
         window:_tween(main, 0.20, { BackgroundTransparency = 0.08 })
     end
 
+    window:_applyBackgroundBlur()
+
+    if window._options.MusicPlayer then
+        local musicOptions = type(window._options.MusicPlayer) == "table" and window._options.MusicPlayer or {}
+        window:AddMusicPlayer(musicOptions)
+    end
+
+    task.defer(function()
+        if not window._destroyed then
+            window:ShowStatus({
+                Title = tostring(window._options.Title or "SALTYGLASS"),
+                Subtitle = "Ready",
+                Icon = "home",
+                Color = window._accent,
+                Duration = 1.35,
+            })
+        end
+    end)
+
     if window._options.StartTab then
         task.defer(function()
             if not window._destroyed then
@@ -2202,6 +3578,29 @@ function SaltyGlass:CreateWindow(options)
     return window
 end
 
+function SaltyGlass:CreateOriginalWindow(options)
+    local original = merge({
+        Title = "SALTY",
+        Subtitle = "ULTRA PREMIUM GLASS",
+        Accent = SaltyGlass.Themes.Violet,
+        Size = UDim2.fromOffset(680, 500),
+        BackgroundBlur = true,
+        BlurSize = 16,
+        SmoothTransitions = true,
+        StatusIsland = true,
+        MusicPlayer = {
+            Title = "Custom Audio",
+            Subtitle = "ROBLOX AUDIO ID",
+            Volume = 0.55,
+            Speed = 1,
+            RepeatMode = 0,
+            MusicBlurSize = 30,
+        },
+    }, options or {})
+    return self:CreateWindow(original)
+end
+
+SaltyGlass.CreatePremiumWindow = SaltyGlass.CreateOriginalWindow
 SaltyGlass.new = SaltyGlass.CreateWindow
 
 return SaltyGlass

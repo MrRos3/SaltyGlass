@@ -24,6 +24,115 @@ Use the versioned URL when you do not want future updates:
 loadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/releases/v3.6.2.lua"))()
 ```
 
+## SaltyGlass UI Library
+
+The full GUI in `latest.lua` is still preserved. For custom scripts, use the reusable library:
+
+```lua
+local source = game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/library.lua")
+local chunk, err = loadstring(source)
+assert(chunk, err)
+
+local Salty = chunk()
+
+local Window = Salty:CreateOriginalWindow({
+    Title = "MY HUB",
+    Subtitle = "POWERED BY SALTYGLASS",
+})
+
+local Main = Window:AddTab("Main", "home")
+
+Main:AddButton({
+    Name = "Hello",
+    Callback = function()
+        Window:Notify({
+            Title = "SaltyGlass",
+            Message = "It works!",
+        })
+    end,
+})
+```
+
+`library.lua` intentionally **returns the API table**. Loading it by itself does not create a visible window; call `CreateWindow(...)` or `CreateOriginalWindow(...)`.
+
+### Direct original-style showcase
+
+If you want a file that creates a GUI immediately:
+
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/showcase.lua"))()
+```
+
+The showcase demonstrates the original Salty feel with:
+
+- background blur
+- animated glass
+- smooth fade/slide tab transitions
+- one-shot page light sweep
+- dynamic status island
+- premium minimized badge
+- clean resize grip
+- reusable custom Roblox audio music player
+- play / pause / stop
+- Repeat / Repeat 1
+- seek / volume / speed
+- themes, custom accent, Reduce Motion, reset controls
+- live FPS / ping / session telemetry
+- custom-content builders
+
+### Library v1.1.0 API
+
+Window:
+
+```text
+CreateWindow
+CreateOriginalWindow / CreatePremiumWindow
+AddTab
+AddMusicPlayer / CreateMusicPlayer
+GetMusicPlayer
+Notify
+ShowStatus
+SetAccent
+SetTheme
+SetBlurEnabled
+SetBlurSize
+SetReduceMotion
+SetSize
+SetPosition
+SetWindowTransparency
+Minimize
+Restore
+Show
+Hide
+Toggle
+Reset
+Destroy
+```
+
+Tab:
+
+```text
+AddSection
+AddLabel / AddParagraph
+AddButton
+AddToggle
+AddSlider
+AddDropdown
+AddTextbox / AddInput
+AddKeybind
+AddColorPicker
+AddDivider
+AddCustom
+```
+
+For a pinned library build:
+
+```lua
+local Salty = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/releases/library-v1.1.0.lua"
+))()
+```
+
 ## Roblox Studio / normal experience use
 
 For a normal Roblox Studio project, use the included ModuleScript source instead of depending on a remote `loadstring`.
@@ -41,74 +150,27 @@ SaltyGlass.Start()
 
 The UI is client-only.
 
-
-## Reusable UI library
-
-SaltyGlass also includes a reusable UI library for custom scripts. The finished full GUI remains in `latest.lua`; the customizable builder API is in `library.lua`.
-
-For compatible client-side environments:
-
-```lua
-local Salty = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/library.lua"
-))()
-
-local Window = Salty:CreateWindow({
-    Title = "My Custom Hub",
-    Subtitle = "POWERED BY SALTYGLASS",
-})
-
-local Main = Window:AddTab("Main", "home")
-
-Main:AddButton({
-    Name = "Hello",
-    Callback = function()
-        Window:Notify({
-            Title = "SaltyGlass",
-            Message = "Hello from a custom script!",
-        })
-    end,
-})
-```
-
-### Library controls
-
-The v1.0.0 API includes:
-
-- `Window:AddTab(name, icon)`
-- `Tab:AddSection()`
-- `Tab:AddLabel()` / `Tab:AddParagraph()`
-- `Tab:AddButton()`
-- `Tab:AddToggle()`
-- `Tab:AddSlider()`
-- `Tab:AddDropdown()`
-- `Tab:AddTextbox()` / `Tab:AddInput()`
-- `Tab:AddKeybind()`
-- `Tab:AddColorPicker()`
-- `Tab:AddDivider()`
-- `Tab:AddCustom()` for completely custom Roblox UI
-
-Window methods include `Notify`, `SetAccent`, `SetTheme`, `SetReduceMotion`, `SetToggleKey`, `SelectTab`, `Minimize`, `Restore`, `Show`, `Hide`, `Toggle`, `ResetLayout`, and `Destroy`.
-
-Most controls return an object with methods such as `Set`, `Get`, `SetCallback`, `SetText`, `SetVisible`, and `Destroy` where appropriate.
-
-Use `examples/LibraryExample.lua` for a complete runnable example.
-
-For normal Roblox Studio use, copy `src/SaltyGlassLibrary.lua` into a ModuleScript and `require()` it from a client LocalScript; see `examples/StudioLibrary.client.lua`.
-
 ## Repository layout
 
 ```text
 SaltyGlass/
 ├── latest.lua
+├── library.lua
+├── showcase.lua
 ├── loader.lua
 ├── VERSION
 ├── src/
 │   ├── SaltyGlass.client.lua
-│   └── SaltyGlassModule.lua
+│   ├── SaltyGlassModule.lua
+│   └── SaltyGlassLibrary.lua
 ├── releases/
-│   └── v3.6.2.lua
+│   ├── v3.6.2.lua
+│   ├── library-v1.0.0.lua
+│   └── library-v1.1.0.lua
 ├── examples/
+│   ├── LibraryExample.lua
+│   ├── OriginalStyleShowcase.lua
+│   ├── StudioLibrary.client.lua
 │   ├── Loadstring.lua
 │   ├── PinnedLoadstring.lua
 │   └── StudioModule.client.lua
