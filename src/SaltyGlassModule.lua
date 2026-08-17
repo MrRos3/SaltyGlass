@@ -491,7 +491,7 @@ function SaltyGlass.Start()
     subtitle.Position = UDim2.new(0, 23, 0, 36)
     subtitle.BackgroundTransparency = 1
     subtitle.Font = Enum.Font.GothamMedium
-    subtitle.Text = "ULTRA GLASS INTERFACE"
+    subtitle.Text = "v1.0.0"
     subtitle.TextColor3 = CONFIG.Colors.Muted
     subtitle.TextSize = 9
     subtitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -3288,7 +3288,7 @@ function SaltyGlass.Start()
 
             pcall(function()
                 if player and player.Parent then
-                    player:Kick("ALT + F4")
+                    player:Kick("You have been kicked!")
                 end
             end)
         end)
