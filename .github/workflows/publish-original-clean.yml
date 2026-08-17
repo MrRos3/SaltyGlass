@@ -40,40 +40,40 @@ jobs:
           root = Path('.')
           icons_path = root / 'icons' / 'Lucide.lua'
           icons_text = icons_path.read_text(encoding='utf-8')
-          entries = dict(re.findall(r'\["([^"]+)"\]\s*=\s*"(rbxassetid://\d+)"', icons_text))
-          icon_count = len(entries)
-          if icon_count < 1000:
-              raise SystemExit(f'Lucide catalog unexpectedly small: {icon_count}')
-
-          required = {
-              'music','play','pause','square','repeat','repeat-2','volume-2','x','minus','plus',
-              'move-diagonal-2','chevron-down','skip-back','skip-forward','log-out','home','user',
-              'settings','eye','globe'
-          }
-          missing = sorted(required - set(entries))
-          if missing:
-              raise SystemExit('Missing required Lucide icons: ' + ', '.join(missing))
+          vendor_entries = dict(re.findall(r'\["([^"]+)"\]\s*=\s*"(rbxassetid://\d+)"', icons_text))
+          vendor_count = len(vendor_entries)
+          if vendor_count < 1000:
+              raise SystemExit(f'Lucide catalog unexpectedly small: {vendor_count}')
+          if 'home' not in vendor_entries or 'globe' not in vendor_entries:
+              raise SystemExit('Lucide catalog missing core home/globe icons')
 
           original = (root / 'latest.lua').read_text(encoding='utf-8')
           original = original.replace('SaltyGlass v3.6.2 RC', 'SaltyGlass v3.6.3 RC', 1)
-
-          return_pos = icons_text.find('return')
-          if return_pos < 0:
-              raise SystemExit('Lucide source has no return table')
-          catalog_expr = icons_text[return_pos + len('return'):].strip()
 
           start = original.find('local LUCIDE_IMAGES = {')
           marker = '\n\nlocal function renderLucideIcon'
           end = original.find(marker, start)
           if start < 0 or end < 0:
               raise SystemExit('Could not locate original Lucide table')
-          original = original[:start] + 'local LUCIDE_IMAGES = ' + catalog_expr + original[end:]
+
+          legacy_block = original[start:end]
+          legacy_entries = dict(re.findall(r'\["([^"]+)"\]\s*=\s*"(rbxassetid://\d+)"', legacy_block))
+          merged = dict(vendor_entries)
+          for name, asset in legacy_entries.items():
+              merged.setdefault(name, asset)
+
+          catalog_lines = ['local LUCIDE_IMAGES = {']
+          for name in sorted(merged):
+              catalog_lines.append(f'    ["{name}"] = "{merged[name]}",')
+          catalog_lines.append('}')
+          catalog = '\n'.join(catalog_lines)
+          original = original[:start] + catalog + original[end:]
 
           parent_line = 'screenGui.Parent = playerGui\n'
           attr_block = (
               'screenGui.Parent = playerGui\n'
               'screenGui:SetAttribute("UISoundsEnabled", premiumFx.uiSoundsEnabled)\n'
-              f'screenGui:SetAttribute("LucideCatalogCount", {icon_count})\n'
+              f'screenGui:SetAttribute("LucideCatalogCount", {len(merged)})\n'
               'screenGui:SetAttribute("LucideCatalogSource", "icons/Lucide.lua")\n'
           )
           if 'screenGui:SetAttribute("UISoundsEnabled"' not in original:
@@ -87,7 +87,9 @@ jobs:
               '        screenGui:SetAttribute("UISoundsEnabled", premiumFx.uiSoundsEnabled)\n'
               '    end\n'
           )
-          sound_slice = original[original.find('function premiumFx.setUiSounds'):original.find('function premiumFx.setReduceMotion')]
+          sound_start = original.find('function premiumFx.setUiSounds')
+          sound_end = original.find('function premiumFx.setReduceMotion')
+          sound_slice = original[sound_start:sound_end]
           if 'screenGui:SetAttribute("UISoundsEnabled", premiumFx.uiSoundsEnabled)' not in sound_slice:
               if sounds_line not in original:
                   raise SystemExit('Could not patch UI sound state')
@@ -168,7 +170,8 @@ jobs:
               'lucide': {
                   'catalog': 'icons/Lucide.lua',
                   'source': 'MrRos3/Icons/lucide/dist/Icons.lua',
-                  'count': icon_count,
+                  'vendor_count': vendor_count,
+                  'renderer_count': len(merged),
                   'sha256': icon_sha256,
               },
               'entrypoints': {
@@ -183,19 +186,20 @@ jobs:
 
           (root / 'icons' / 'README.md').write_text(
               '# Lucide icon catalog\n\n'
-              f'`Lucide.lua` contains **{icon_count}** Roblox ImageLabel asset mappings.\n\n'
-              'Source: `MrRos3/Icons/lucide/dist/Icons.lua`. The file is vendored into SaltyGlass so the original renderer can resolve the complete catalog instead of a small hardcoded subset.\n\n'
+              f'`Lucide.lua` contains **{vendor_count}** Roblox ImageLabel asset mappings from the generated source catalog.\n\n'
+              f'The SaltyGlass renderer exposes **{len(merged)}** names after preserving any legacy Salty aliases that are not present in the current catalog.\n\n'
+              'Source: `MrRos3/Icons/lucide/dist/Icons.lua`.\n\n'
               f'SHA-256: `{icon_sha256}`\n',
               encoding='utf-8'
           )
 
-          readme = f'''# SaltyGlass\n\nSaltyGlass is the original glass-style Roblox client UI by **MrRos3**. The repository now keeps one visual direction only: the finished original SaltyGlass look.\n\n## Run the original GUI\n\n```lua\nloadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/latest.lua"))()\n```\n\n## Run the original-looking feature pack\n\n```lua\nloadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/feature-pack.lua"))()\n```\n\nThe feature pack loads the original GUI first and then adds Player, World, and Utility controls without replacing its visual design. The World tab uses the original tab chrome and the same UI click/hover sound assets as the rest of SaltyGlass.\n\n### Feature pack\n\nPlayer controls include movement override, WalkSpeed, jump strength, hold-Shift sprint, sprint speed, camera FOV, max camera zoom, mouse sensitivity, camera height offset, and reset. World controls include fullbright, fog, shadows, time of day, brightness, exposure, saturation, contrast, bloom, bloom intensity, sun rays, and reset. Utility controls include crosshair options plus an FPS/ping/session overlay.\n\n## Lucide icons\n\nThe original icon renderer now contains the full vendored Lucide catalog: **{icon_count} icon assets** from `MrRos3/Icons/lucide/dist/Icons.lua`. Any catalog key can be passed to the renderer; the feature pack uses `globe` for the World tab.\n\nThe standalone catalog is also available at `icons/Lucide.lua`.\n\n## Repository layout\n\n- `latest.lua` — clean original SaltyGlass v3.6.3 RC.\n- `feature-pack.lua` — original GUI plus the expanded feature set.\n- `showcase.lua` — one-line feature-pack launcher.\n- `icons/Lucide.lua` — complete Roblox Lucide asset table.\n- `src/SaltyGlass.client.lua` — Studio LocalScript source.\n- `src/SaltyGlassModule.lua` — Studio ModuleScript wrapper.\n- `releases/v3.6.3.lua` — pinned original release.\n- `releases/feature-pack-v1.0.0.lua` — pinned feature-pack release.\n\n`HttpGet` + `loadstring` requires a compatible client environment. For normal Roblox Studio projects, use the sources under `src/`.\n'''
+          readme = f'''# SaltyGlass\n\nSaltyGlass is the original glass-style Roblox client UI by **MrRos3**. The repository now keeps one visual direction only: the finished original SaltyGlass look.\n\n## Run the original GUI\n\n```lua\nloadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/latest.lua"))()\n```\n\n## Run the original-looking feature pack\n\n```lua\nloadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/feature-pack.lua"))()\n```\n\nThe feature pack loads the original GUI first and then adds Player, World, and Utility controls without replacing its visual design. The World tab uses the original tab chrome and the same UI click/hover sound assets as the rest of SaltyGlass.\n\n### Feature pack\n\nPlayer controls include movement override, WalkSpeed, jump strength, hold-Shift sprint, sprint speed, camera FOV, max camera zoom, mouse sensitivity, camera height offset, and reset. World controls include fullbright, fog, shadows, time of day, brightness, exposure, saturation, contrast, bloom, bloom intensity, sun rays, and reset. Utility controls include crosshair options plus an FPS/ping/session overlay.\n\n## Lucide icons\n\nThe original icon renderer now uses the full vendored Lucide catalog: **{vendor_count} generated icon assets**, with **{len(merged)} renderer names** after legacy Salty aliases are preserved. Any catalog key can be passed to the original renderer. The feature pack uses the catalog's `globe` asset for the World tab.\n\nThe standalone catalog is `icons/Lucide.lua`.\n\n## Repository layout\n\n- `latest.lua` — clean original SaltyGlass v3.6.3 RC.\n- `feature-pack.lua` — original GUI plus the expanded feature set.\n- `showcase.lua` — one-line feature-pack launcher.\n- `icons/Lucide.lua` — complete Roblox Lucide asset table.\n- `src/SaltyGlass.client.lua` — Studio LocalScript source.\n- `src/SaltyGlassModule.lua` — Studio ModuleScript wrapper.\n- `releases/v3.6.3.lua` — pinned original release.\n- `releases/feature-pack-v1.0.0.lua` — pinned feature-pack release.\n\n`HttpGet` + `loadstring` requires a compatible client environment. For normal Roblox Studio projects, use the sources under `src/`.\n'''
           (root / 'README.md').write_text(readme, encoding='utf-8')
 
           old_changelog = (root / 'CHANGELOG.md').read_text(encoding='utf-8') if (root / 'CHANGELOG.md').exists() else '# Changelog\n'
           if old_changelog.startswith('# Changelog'):
               old_changelog = old_changelog[len('# Changelog'):].lstrip('\n')
-          changelog = f'''# Changelog\n\n## 3.6.3 RC / Feature Pack 1.0.0\n\n- Kept the finished original SaltyGlass visual design as the only GUI style in the repository.\n- Vendored all {icon_count} Lucide Roblox asset mappings and connected the original icon renderer to the complete catalog.\n- Added `feature-pack.lua` with Player, World, and Utility features while preserving the original UI.\n- Added a fifth original-style World tab with a Lucide globe icon.\n- Fixed click/hover UI sounds for the World tab and injected controls; they follow the original UI Sounds toggle.\n- Removed the old generic/recreated `library.lua` GUI and its library examples/releases.\n- Added pinned original and feature-pack releases.\n\n''' + old_changelog
+          changelog = f'''# Changelog\n\n## 3.6.3 RC / Feature Pack 1.0.0\n\n- Kept the finished original SaltyGlass visual design as the only GUI style in the repository.\n- Vendored all {vendor_count} generated Lucide Roblox asset mappings and connected the original icon renderer to the complete catalog while preserving legacy aliases.\n- Added `feature-pack.lua` with Player, World, and Utility features while preserving the original UI.\n- Added a fifth original-style World tab with the Lucide `globe` icon.\n- Fixed click/hover UI sounds for the World tab and injected controls; they follow the original UI Sounds toggle.\n- Removed the old generic/recreated `library.lua` GUI and its library examples/releases.\n- Added pinned original and feature-pack releases.\n\n''' + old_changelog
           (root / 'CHANGELOG.md').write_text(changelog, encoding='utf-8')
           PY
 
@@ -210,7 +214,7 @@ jobs:
           /tmp/luau/luau-compile icons/Lucide.lua >/dev/null
           /tmp/luau/luau-compile src/SaltyGlassModule.lua >/dev/null
 
-      - name: Final integrity and cleanup
+      - name: Final integrity
         shell: bash
         run: |
           set -euo pipefail
@@ -220,10 +224,11 @@ jobs:
           grep -q 'UISoundsEnabled' latest.lua
           grep -q 'playInjectedClick' feature-pack.lua
           grep -q 'WorldTab' feature-pack.lua
-          rm -rf publish_payload
-          rm -f .github/workflows/publish-original-clean.yml
           find . -type f \
             ! -path './.git/*' \
+            ! -path './.github/workflows/*' \
+            ! -path './publish_payload/*' \
+            ! -path './diag/*' \
             ! -name 'SHA256SUMS.txt' \
             -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
 
