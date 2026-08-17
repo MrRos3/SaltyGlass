@@ -1,0 +1,80 @@
+name: Publish SaltyGlass Library v1.1
+
+on:
+  push:
+    paths:
+      - "bootstrap_v11/READY"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rebuild verified payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat bootstrap_v11/payload.b64.part* | base64 --decode > /tmp/salty-v11.tar.xz
+          echo "4d5ea841404629ba354bbf5107ae0150a3a536d3c3a7a65e6e53c3a738757eeb  /tmp/salty-v11.tar.xz" | sha256sum -c -
+          rm -rf /tmp/salty-v11
+          mkdir -p /tmp/salty-v11
+          tar -xJf /tmp/salty-v11.tar.xz -C /tmp/salty-v11
+          test -s /tmp/salty-v11/library.lua
+          test -s /tmp/salty-v11/showcase.lua
+
+      - name: Compile with official Luau
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o /tmp/luau.zip https://github.com/luau-lang/luau/releases/download/0.734/luau-ubuntu.zip
+          rm -rf /tmp/luau-bin
+          mkdir -p /tmp/luau-bin
+          unzip -q /tmp/luau.zip -d /tmp/luau-bin
+          chmod +x /tmp/luau-bin/luau* || true
+          /tmp/luau-bin/luau-compile /tmp/salty-v11/library.lua >/dev/null
+          /tmp/luau-bin/luau-compile /tmp/salty-v11/showcase.lua >/dev/null
+          /tmp/luau-bin/luau-compile /tmp/salty-v11/examples/StudioLibrary.client.lua >/dev/null
+
+      - name: Verify library contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'SaltyGlass UI Library v1.1.0' /tmp/salty-v11/library.lua
+          grep -Fq 'function WindowMethods:AddMusicPlayer' /tmp/salty-v11/library.lua
+          grep -Fq 'function SaltyGlass:CreateOriginalWindow' /tmp/salty-v11/library.lua
+          grep -Fq 'return SaltyGlass' /tmp/salty-v11/library.lua
+          grep -Fq 'CreateOriginalWindow' /tmp/salty-v11/showcase.lua
+
+      - name: Publish library and showcase
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/salty-v11/library.lua library.lua
+          cp /tmp/salty-v11/library.lua src/SaltyGlassLibrary.lua
+          cp /tmp/salty-v11/library.lua releases/library-v1.1.0.lua
+          cp /tmp/salty-v11/showcase.lua showcase.lua
+          cp /tmp/salty-v11/examples/LibraryExample.lua examples/LibraryExample.lua
+          cp /tmp/salty-v11/examples/OriginalStyleShowcase.lua examples/OriginalStyleShowcase.lua
+          cp /tmp/salty-v11/examples/StudioLibrary.client.lua examples/StudioLibrary.client.lua
+          cp /tmp/salty-v11/README.md README.md
+          cp /tmp/salty-v11/CHANGELOG.md CHANGELOG.md
+          cp /tmp/salty-v11/manifest.json manifest.json
+          rm -rf bootstrap_v11
+          rm -f .github/workflows/publish-library-v1.1.yml
+
+          find . -type f \
+            ! -path './.git/*' \
+            ! -path './.github/*' \
+            ! -name 'SHA256SUMS.txt' \
+            -print0 | sort -z | xargs -0 sha256sum | sed 's#  \./#  #' > SHA256SUMS.txt
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Upgrade SaltyGlass Library to v1.1.0"
+          git push
