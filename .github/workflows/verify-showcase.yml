@@ -5,6 +5,9 @@ on:
     paths:
       - "verify_showcase/READY"
 
+permissions:
+  contents: write
+
 jobs:
   compile:
     runs-on: ubuntu-latest
@@ -23,3 +26,13 @@ jobs:
           /tmp/luau/luau-compile showcase.lua >/dev/null
           /tmp/luau/luau-compile examples/OriginalStyleShowcase.lua >/dev/null
           /tmp/luau/luau-compile examples/LibraryExample.lua >/dev/null
+      - name: Mark verification passed
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'verified\n' > verify_showcase/PASSED
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add verify_showcase/PASSED
+          git commit -m "Mark showcase compile verification passed"
+          git push
