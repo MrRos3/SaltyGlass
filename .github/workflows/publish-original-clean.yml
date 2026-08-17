@@ -1,0 +1,242 @@
+name: Publish Original SaltyGlass Clean Build
+
+on:
+  push:
+    paths:
+      - "publish_payload/READY"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct feature pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d publish_payload/feature-pack.lua.gz.b64 | gzip -dc > feature-pack.lua
+          echo "cf9ed44a2f6e64da38b8a9263258a0199fd7442803e79c2e57ddc01a57aa53de  feature-pack.lua" | sha256sum -c -
+
+      - name: Vendor full Lucide catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p icons
+          curl -fsSL "https://raw.githubusercontent.com/MrRos3/Icons/main/lucide/dist/Icons.lua" -o icons/Lucide.lua
+          test -s icons/Lucide.lua
+
+      - name: Build clean original-only repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, re, shutil
+
+          root = Path('.')
+          icons_path = root / 'icons' / 'Lucide.lua'
+          icons_text = icons_path.read_text(encoding='utf-8')
+          entries = dict(re.findall(r'\["([^"]+)"\]\s*=\s*"(rbxassetid://\d+)"', icons_text))
+          icon_count = len(entries)
+          if icon_count < 1000:
+              raise SystemExit(f'Lucide catalog unexpectedly small: {icon_count}')
+
+          required = {
+              'music','play','pause','square','repeat','repeat-2','volume-2','x','minus','plus',
+              'move-diagonal-2','chevron-down','skip-back','skip-forward','log-out','home','user',
+              'settings','eye','globe','globe-2'
+          }
+          missing = sorted(required - set(entries))
+          if missing:
+              raise SystemExit('Missing required Lucide icons: ' + ', '.join(missing))
+
+          original = (root / 'latest.lua').read_text(encoding='utf-8')
+          original = original.replace('SaltyGlass v3.6.2 RC', 'SaltyGlass v3.6.3 RC', 1)
+
+          return_pos = icons_text.find('return')
+          if return_pos < 0:
+              raise SystemExit('Lucide source has no return table')
+          catalog_expr = icons_text[return_pos + len('return'):].strip()
+
+          start = original.find('local LUCIDE_IMAGES = {')
+          marker = '\n\nlocal function renderLucideIcon'
+          end = original.find(marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit('Could not locate original Lucide table')
+          original = original[:start] + 'local LUCIDE_IMAGES = ' + catalog_expr + original[end:]
+
+          parent_line = 'screenGui.Parent = playerGui\n'
+          attr_block = (
+              'screenGui.Parent = playerGui\n'
+              'screenGui:SetAttribute("UISoundsEnabled", premiumFx.uiSoundsEnabled)\n'
+              f'screenGui:SetAttribute("LucideCatalogCount", {icon_count})\n'
+              'screenGui:SetAttribute("LucideCatalogSource", "icons/Lucide.lua")\n'
+          )
+          if 'screenGui:SetAttribute("UISoundsEnabled"' not in original:
+              original = original.replace(parent_line, attr_block, 1)
+
+          sounds_line = 'function premiumFx.setUiSounds(enabled)\n    premiumFx.uiSoundsEnabled = enabled == true\n'
+          sounds_replacement = (
+              'function premiumFx.setUiSounds(enabled)\n'
+              '    premiumFx.uiSoundsEnabled = enabled == true\n'
+              '    if screenGui and screenGui.Parent then\n'
+              '        screenGui:SetAttribute("UISoundsEnabled", premiumFx.uiSoundsEnabled)\n'
+              '    end\n'
+          )
+          if 'screenGui:SetAttribute("UISoundsEnabled", premiumFx.uiSoundsEnabled)' not in original[original.find('function premiumFx.setUiSounds'):original.find('function premiumFx.setReduceMotion')]:
+              if sounds_line not in original:
+                  raise SystemExit('Could not patch UI sound state')
+              original = original.replace(sounds_line, sounds_replacement, 1)
+
+          (root / 'latest.lua').write_text(original, encoding='utf-8')
+          (root / 'src').mkdir(exist_ok=True)
+          (root / 'src' / 'SaltyGlass.client.lua').write_text(original, encoding='utf-8')
+          (root / 'releases').mkdir(exist_ok=True)
+          (root / 'releases' / 'v3.6.3.lua').write_text(original, encoding='utf-8')
+
+          # Studio ModuleScript wrapper: same original-looking core, no generic recreated UI.
+          indented = ''.join('    ' + line if line.strip() else line for line in original.splitlines(True))
+          module = (
+              'local SaltyGlass = { Version = "3.6.3 RC" }\n\n'
+              'function SaltyGlass.Start()\n'
+              + indented +
+              '    return screenGui\n'
+              'end\n\n'
+              'return SaltyGlass\n'
+          )
+          (root / 'src' / 'SaltyGlassModule.lua').write_text(module, encoding='utf-8')
+
+          feature = (root / 'feature-pack.lua').read_text(encoding='utf-8')
+          (root / 'releases' / 'feature-pack-v1.0.0.lua').write_text(feature, encoding='utf-8')
+
+          # Remove old generic/recreated library GUI files.
+          remove_files = [
+              'library.lua',
+              'src/SaltyGlassLibrary.lua',
+              'releases/library-v1.0.0.lua',
+              'releases/library-v1.1.0.lua',
+          ]
+          for rel in remove_files:
+              p = root / rel
+              if p.exists():
+                  p.unlink()
+
+          # Clean examples: only original-looking entry points remain.
+          examples = root / 'examples'
+          examples.mkdir(exist_ok=True)
+          for p in examples.iterdir():
+              if p.is_file():
+                  p.unlink()
+          (examples / 'Original.lua').write_text(
+              'loadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/latest.lua"))()\n',
+              encoding='utf-8'
+          )
+          (examples / 'FeaturePack.lua').write_text(
+              'loadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/feature-pack.lua"))()\n',
+              encoding='utf-8'
+          )
+          (examples / 'PinnedOriginal.lua').write_text(
+              'loadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/releases/v3.6.3.lua"))()\n',
+              encoding='utf-8'
+          )
+          (examples / 'StudioModule.client.lua').write_text(
+              'local module = script.Parent:WaitForChild("SaltyGlassModule")\nlocal SaltyGlass = require(module)\nSaltyGlass.Start()\n',
+              encoding='utf-8'
+          )
+
+          # Stable aliases.
+          (root / 'loader.lua').write_text(
+              'loadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/latest.lua"))()\n',
+              encoding='utf-8'
+          )
+          (root / 'showcase.lua').write_text(
+              'loadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/feature-pack.lua"))()\n',
+              encoding='utf-8'
+          )
+          (root / 'VERSION').write_text('3.6.3 RC\n', encoding='utf-8')
+
+          icon_sha256 = hashlib.sha256(icons_path.read_bytes()).hexdigest()
+          manifest = {
+              'name': 'SaltyGlass',
+              'owner': 'MrRos3',
+              'version': '3.6.3 RC',
+              'feature_pack_version': '1.0.0',
+              'stable_raw': 'https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/latest.lua',
+              'feature_pack_raw': 'https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/feature-pack.lua',
+              'pinned_raw': 'https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/releases/v3.6.3.lua',
+              'feature_pack_pinned_raw': 'https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/releases/feature-pack-v1.0.0.lua',
+              'lucide': {
+                  'catalog': 'icons/Lucide.lua',
+                  'source': 'MrRos3/Icons/lucide/dist/Icons.lua',
+                  'count': icon_count,
+                  'sha256': icon_sha256,
+              },
+              'entrypoints': {
+                  'original': 'latest.lua',
+                  'feature_pack': 'feature-pack.lua',
+                  'showcase': 'showcase.lua',
+                  'studio_local_script': 'src/SaltyGlass.client.lua',
+                  'studio_module': 'src/SaltyGlassModule.lua',
+              },
+          }
+          (root / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+
+          (root / 'icons' / 'README.md').write_text(
+              '# Lucide icon catalog\n\n'
+              f'`Lucide.lua` contains **{icon_count}** Roblox ImageLabel asset mappings.\n\n'
+              'Source: `MrRos3/Icons/lucide/dist/Icons.lua`. The file is vendored into SaltyGlass so the original renderer can resolve the complete catalog instead of a small hardcoded subset.\n\n'
+              f'SHA-256: `{icon_sha256}`\n',
+              encoding='utf-8'
+          )
+
+          readme = f'''# SaltyGlass\n\nSaltyGlass is the original glass-style Roblox client UI by **MrRos3**. The repository now keeps one visual direction only: the finished original SaltyGlass look.\n\n## Run the original GUI\n\n```lua\nloadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/latest.lua"))()\n```\n\n## Run the original-looking feature pack\n\n```lua\nloadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/feature-pack.lua"))()\n```\n\nThe feature pack loads the original GUI first and then adds Player, World, and Utility controls without replacing its visual design. The World tab uses the original tab chrome and now uses the same UI click/hover sound assets as the rest of SaltyGlass.\n\n### Feature pack\n\nPlayer controls include movement override, WalkSpeed, jump strength, hold-Shift sprint, sprint speed, camera FOV, max camera zoom, mouse sensitivity, camera height offset, and reset. World controls include fullbright, fog, shadows, time of day, brightness, exposure, saturation, contrast, bloom, bloom intensity, sun rays, and reset. Utility controls include crosshair options plus an FPS/ping/session overlay.\n\n## Lucide icons\n\nThe original icon renderer now contains the full vendored Lucide catalog: **{icon_count} icon assets** from `MrRos3/Icons/lucide/dist/Icons.lua`. Any catalog key can be passed to the renderer; the feature pack uses the catalog for the World globe icon.\n\nThe standalone catalog is also available at `icons/Lucide.lua`.\n\n## Repository layout\n\n- `latest.lua` — clean original SaltyGlass v3.6.3 RC.\n- `feature-pack.lua` — original GUI plus the expanded feature set.\n- `showcase.lua` — one-line feature-pack launcher.\n- `icons/Lucide.lua` — complete Roblox Lucide asset table.\n- `src/SaltyGlass.client.lua` — Studio LocalScript source.\n- `src/SaltyGlassModule.lua` — Studio ModuleScript wrapper.\n- `releases/v3.6.3.lua` — pinned original release.\n- `releases/feature-pack-v1.0.0.lua` — pinned feature-pack release.\n\n`HttpGet` + `loadstring` requires a compatible client environment. For normal Roblox Studio projects, use the sources under `src/`.\n'''
+          (root / 'README.md').write_text(readme, encoding='utf-8')
+
+          old_changelog = (root / 'CHANGELOG.md').read_text(encoding='utf-8') if (root / 'CHANGELOG.md').exists() else '# Changelog\n'
+          if old_changelog.startswith('# Changelog'):
+              old_changelog = old_changelog[len('# Changelog'):].lstrip('\n')
+          changelog = f'''# Changelog\n\n## 3.6.3 RC / Feature Pack 1.0.0\n\n- Kept the finished original SaltyGlass visual design as the only GUI style in the repository.\n- Vendored all {icon_count} Lucide Roblox asset mappings and connected the original icon renderer to the complete catalog.\n- Added `feature-pack.lua` with Player, World, and Utility features while preserving the original UI.\n- Added a fifth original-style World tab with a Lucide globe icon.\n- Fixed click/hover UI sounds for the World tab and injected controls; they follow the original UI Sounds toggle.\n- Removed the old generic/recreated `library.lua` GUI and its library examples/releases.\n- Added pinned original and feature-pack releases.\n\n''' + old_changelog
+          (root / 'CHANGELOG.md').write_text(changelog, encoding='utf-8')
+          PY
+
+      - name: Compile with official Luau
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/luau-lang/luau/releases/download/0.734/luau-ubuntu.zip" -o /tmp/luau.zip
+          unzip -q /tmp/luau.zip -d /tmp/luau
+          /tmp/luau/luau-compile latest.lua >/dev/null
+          /tmp/luau/luau-compile feature-pack.lua >/dev/null
+          /tmp/luau/luau-compile icons/Lucide.lua >/dev/null
+          /tmp/luau/luau-compile src/SaltyGlassModule.lua >/dev/null
+
+      - name: Final integrity and cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e library.lua
+          test ! -e src/SaltyGlassLibrary.lua
+          test -s icons/Lucide.lua
+          grep -q 'UISoundsEnabled' latest.lua
+          grep -q 'playInjectedClick' feature-pack.lua
+          grep -q 'WorldTab' feature-pack.lua
+          rm -rf publish_payload
+          rm -f .github/workflows/publish-original-clean.yml
+          find . -type f \
+            ! -path './.git/*' \
+            ! -name 'SHA256SUMS.txt' \
+            -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+
+      - name: Commit clean publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "MrRos3"
+          git config user.email "114161345+MrRos3@users.noreply.github.com"
+          git add -A
+          git commit -m "Publish original SaltyGlass feature pack and full Lucide catalog"
+          git push
