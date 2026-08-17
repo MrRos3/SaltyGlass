@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.6.3 RC / Feature Pack 1.0.0
+
+- Original SaltyGlass look is now the only GUI direction in the repo.
+- Vendored 1715 generated Lucide assets; renderer exposes 1716 names with legacy fallbacks.
+- Added original-looking Player, World, and Utility feature pack.
+- Added original-style World tab with Lucide globe icon.
+- Fixed World/injected control click and hover sounds to follow the original UI Sounds setting.
+- Removed the old generic library GUI and generic-library examples/releases.
+
+# Changelog
+
 ## SaltyGlass UI Library v1.1.0
 
 Premium/original-style library pass.

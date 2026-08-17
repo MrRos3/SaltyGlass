@@ -1,19 +1,24 @@
 {
   "name": "SaltyGlass",
   "owner": "MrRos3",
-  "version": "3.6.2 RC",
+  "version": "3.6.3 RC",
+  "feature_pack_version": "1.0.0",
   "stable_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/latest.lua",
-  "pinned_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/releases/v3.6.2.lua",
-  "entrypoints": {
-    "loadstring": "latest.lua",
-    "studio_local_script": "src/SaltyGlass.client.lua",
-    "studio_module": "src/SaltyGlassModule.lua",
-    "library": "library.lua",
-    "studio_library": "src/SaltyGlassLibrary.lua",
-    "showcase": "showcase.lua"
+  "feature_pack_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/feature-pack.lua",
+  "pinned_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/releases/v3.6.3.lua",
+  "feature_pack_pinned_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/releases/feature-pack-v1.0.0.lua",
+  "lucide": {
+    "catalog": "icons/Lucide.lua",
+    "source": "MrRos3/Icons/lucide/dist/Icons.lua",
+    "vendor_count": 1715,
+    "renderer_count": 1716,
+    "sha256": "36581936d1ec3ff107ae514cd09422f43ecaae9b3fed5759ec1a02ad063a7ccd"
   },
-  "library_version": "1.1.0",
-  "library_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/library.lua",
-  "library_pinned_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/releases/library-v1.1.0.lua",
-  "showcase_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/showcase.lua"
+  "entrypoints": {
+    "original": "latest.lua",
+    "feature_pack": "feature-pack.lua",
+    "showcase": "showcase.lua",
+    "studio_local_script": "src/SaltyGlass.client.lua",
+    "studio_module": "src/SaltyGlassModule.lua"
+  }
 }
