@@ -482,7 +482,7 @@ subtitle.Size = UDim2.fromOffset(230, 18)
 subtitle.Position = UDim2.new(0, 23, 0, 36)
 subtitle.BackgroundTransparency = 1
 subtitle.Font = Enum.Font.GothamMedium
-subtitle.Text = "ULTRA GLASS INTERFACE"
+subtitle.Text = "v1.0.0"
 subtitle.TextColor3 = CONFIG.Colors.Muted
 subtitle.TextSize = 9
 subtitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -3279,7 +3279,7 @@ altF4Button.MouseButton1Click:Connect(function()
 
         pcall(function()
             if player and player.Parent then
-                player:Kick("ALT + F4")
+                player:Kick("You have been kicked!")
             end
         end)
     end)
