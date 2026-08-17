@@ -1,0 +1,18 @@
+commit=960b8f5ae45f7a4e488f10c0ea0a39d3745e32c5
+reconstruct=0
+/tmp/feature.lua: OK
+feature_hash=0
+icon_download=0
+1715
+icon_grep=0
+vendor_count=1715
+table_start=12683
+table_end=13556
+legacy_count=19
+merged_count=1716
+patched_bytes=254938
+patch_build=0
+compiler_download=0
+compiler_unzip=0
+feature_compile=0
+patched_compile=0
