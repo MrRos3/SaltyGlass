@@ -41,6 +41,61 @@ SaltyGlass.Start()
 
 The UI is client-only.
 
+
+## Reusable UI library
+
+SaltyGlass also includes a reusable UI library for custom scripts. The finished full GUI remains in `latest.lua`; the customizable builder API is in `library.lua`.
+
+For compatible client-side environments:
+
+```lua
+local Salty = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/library.lua"
+))()
+
+local Window = Salty:CreateWindow({
+    Title = "My Custom Hub",
+    Subtitle = "POWERED BY SALTYGLASS",
+})
+
+local Main = Window:AddTab("Main", "home")
+
+Main:AddButton({
+    Name = "Hello",
+    Callback = function()
+        Window:Notify({
+            Title = "SaltyGlass",
+            Message = "Hello from a custom script!",
+        })
+    end,
+})
+```
+
+### Library controls
+
+The v1.0.0 API includes:
+
+- `Window:AddTab(name, icon)`
+- `Tab:AddSection()`
+- `Tab:AddLabel()` / `Tab:AddParagraph()`
+- `Tab:AddButton()`
+- `Tab:AddToggle()`
+- `Tab:AddSlider()`
+- `Tab:AddDropdown()`
+- `Tab:AddTextbox()` / `Tab:AddInput()`
+- `Tab:AddKeybind()`
+- `Tab:AddColorPicker()`
+- `Tab:AddDivider()`
+- `Tab:AddCustom()` for completely custom Roblox UI
+
+Window methods include `Notify`, `SetAccent`, `SetTheme`, `SetReduceMotion`, `SetToggleKey`, `SelectTab`, `Minimize`, `Restore`, `Show`, `Hide`, `Toggle`, `ResetLayout`, and `Destroy`.
+
+Most controls return an object with methods such as `Set`, `Get`, `SetCallback`, `SetText`, `SetVisible`, and `Destroy` where appropriate.
+
+Use `examples/LibraryExample.lua` for a complete runnable example.
+
+For normal Roblox Studio use, copy `src/SaltyGlassLibrary.lua` into a ModuleScript and `require()` it from a client LocalScript; see `examples/StudioLibrary.client.lua`.
+
 ## Repository layout
 
 ```text

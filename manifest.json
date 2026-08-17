@@ -7,6 +7,11 @@
   "entrypoints": {
     "loadstring": "latest.lua",
     "studio_local_script": "src/SaltyGlass.client.lua",
-    "studio_module": "src/SaltyGlassModule.lua"
-  }
+    "studio_module": "src/SaltyGlassModule.lua",
+    "library": "library.lua",
+    "studio_library": "src/SaltyGlassLibrary.lua"
+  },
+  "library_version": "1.0.0",
+  "library_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/library.lua",
+  "library_pinned_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/releases/library-v1.0.0.lua"
 }

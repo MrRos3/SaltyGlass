@@ -1,5 +1,14 @@
 # Changelog
 
+## SaltyGlass Library v1.0.0
+
+- Added `library.lua`, a reusable custom UI builder.
+- Added window, tab, section, label, button, toggle, slider, dropdown, textbox, keybind, color picker, divider, and custom-content APIs.
+- Added window notifications, themes, custom accents, Reduce Motion, minimize/restore, resize, drag, hotkey show/hide, and cleanup.
+- Added `releases/library-v1.0.0.lua` for a pinned library build.
+- Added `examples/LibraryExample.lua`.
+- Kept the finished v3.6.2 full GUI in `latest.lua` unchanged.
+
 ## v3.6.2 RC
 
 Release-candidate UI build.
