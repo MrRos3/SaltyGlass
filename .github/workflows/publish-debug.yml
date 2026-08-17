@@ -51,9 +51,13 @@ jobs:
           lines.append('}')
           patched = original[:start] + '\n'.join(lines) + original[end:]
           Path('/tmp/patched.lua').write_text(patched, encoding='utf-8')
+          indented = ''.join('    ' + line if line.strip() else line for line in patched.splitlines(True))
+          module = 'local SaltyGlass = { Version = "3.6.3 RC" }\n\nfunction SaltyGlass.Start()\n' + indented + '    return screenGui\nend\n\nreturn SaltyGlass\n'
+          Path('/tmp/module.lua').write_text(module, encoding='utf-8')
           print('legacy_count=' + str(len(legacy)))
           print('merged_count=' + str(len(merged)))
           print('patched_bytes=' + str(len(patched.encode())))
+          print('module_bytes=' + str(len(module.encode())))
           PY
           echo "patch_build=$?" >> "$LOG"
 
@@ -68,9 +72,12 @@ jobs:
           /tmp/luau/luau-compile /tmp/patched.lua >/tmp/patched.out 2>/tmp/patched.err
           echo "patched_compile=$?" >> "$LOG"
           cat /tmp/patched.err >> "$LOG"
+          /tmp/luau/luau-compile /tmp/module.lua >/tmp/module.out 2>/tmp/module.err
+          echo "module_compile=$?" >> "$LOG"
+          cat /tmp/module.err >> "$LOG"
 
           git config user.name "MrRos3"
           git config user.email "114161345+MrRos3@users.noreply.github.com"
           git add diag/publish-debug.txt
-          git commit -m "Record SaltyGlass publish diagnostic"
+          git commit -m "Record SaltyGlass extended publish diagnostic"
           git push
