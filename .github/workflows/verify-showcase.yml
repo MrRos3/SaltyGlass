@@ -1,0 +1,25 @@
+name: Verify Showcase Compatibility
+
+on:
+  push:
+    paths:
+      - "verify_showcase/READY"
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download official Luau compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/luau-lang/luau/releases/download/0.734/luau-ubuntu.zip -o /tmp/luau.zip
+          unzip -q /tmp/luau.zip -d /tmp/luau
+      - name: Compile compatibility files
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/luau/luau-compile showcase.lua >/dev/null
+          /tmp/luau/luau-compile examples/OriginalStyleShowcase.lua >/dev/null
+          /tmp/luau/luau-compile examples/LibraryExample.lua >/dev/null
