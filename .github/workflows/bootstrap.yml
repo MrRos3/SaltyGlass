@@ -1,0 +1,52 @@
+name: Bootstrap SaltyGlass
+
+on:
+  push:
+    paths:
+      - "bootstrap/READY"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rebuild prepared project
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat bootstrap/bundle.b64.part* | base64 --decode > /tmp/SaltyGlass-GitHub-Ready.zip
+          rm -rf /tmp/saltyglass-unpack
+          mkdir -p /tmp/saltyglass-unpack
+          unzip -q /tmp/SaltyGlass-GitHub-Ready.zip -d /tmp/saltyglass-unpack
+          test -f /tmp/saltyglass-unpack/SaltyGlass/latest.lua
+          test -f /tmp/saltyglass-unpack/SaltyGlass/src/SaltyGlassModule.lua
+          cp -a /tmp/saltyglass-unpack/SaltyGlass/. .
+          rm -rf bootstrap
+
+      - name: Verify stable entrypoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s latest.lua
+          test -s releases/v3.6.2.lua
+          test -s src/SaltyGlass.client.lua
+          test -s src/SaltyGlassModule.lua
+          grep -Fq 'SaltyGlass v3.6.2 RC' latest.lua
+          grep -Fq 'loadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/latest.lua"))()' README.md
+
+      - name: Publish prepared files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish SaltyGlass v3.6.2 RC"
+            git push
+          fi
