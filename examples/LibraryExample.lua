@@ -1,6 +1,3 @@
--- SaltyGlass Original-Style Showcase
--- Directly executable example for SaltyGlass Library v1.1.0.
-
 local LIBRARY_URL = "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/library.lua"
 
 local source = game:HttpGet(LIBRARY_URL)
@@ -38,10 +35,6 @@ local Player = Window:AddTab("Player", "user")
 local Settings = Window:AddTab("Settings", "settings")
 local Visuals = Window:AddTab("Visuals", "eye")
 
-------------------------------------------------
--- HOME
-------------------------------------------------
-
 Home:AddSection("OVERVIEW")
 
 Home:AddLabel({
@@ -51,7 +44,7 @@ Home:AddLabel({
 })
 
 local telemetry = Home:AddLabel({
-    Name = "FPS  --   •   PING  --   •   SESSION  0:00",
+    Name = "FPS  --   |   PING  --   |   SESSION  0:00",
     Description = "Live client telemetry",
 })
 
@@ -79,10 +72,6 @@ Home:AddButton({
         })
     end,
 })
-
-------------------------------------------------
--- PLAYER
-------------------------------------------------
 
 Player:AddSection("LOCAL PROFILE")
 
@@ -120,10 +109,6 @@ Player:AddButton({
         })
     end,
 })
-
-------------------------------------------------
--- SETTINGS
-------------------------------------------------
 
 Settings:AddSection("THEME")
 
@@ -236,10 +221,6 @@ Settings:AddButton({
     end,
 })
 
-------------------------------------------------
--- VISUALS
-------------------------------------------------
-
 Visuals:AddSection("INTERFACE")
 
 Visuals:AddToggle({
@@ -299,10 +280,6 @@ Visuals:AddCustom({
     end,
 })
 
-------------------------------------------------
--- LIVE TELEMETRY
-------------------------------------------------
-
 local frameCount = 0
 local fps = 0
 local lastSample = os.clock()
@@ -319,7 +296,7 @@ local function getPing()
 end
 
 telemetryConnection = RunService.RenderStepped:Connect(function()
-    frameCount += 1
+    frameCount = frameCount + 1
 
     local now = os.clock()
     local elapsed = now - lastSample
@@ -334,7 +311,7 @@ telemetryConnection = RunService.RenderStepped:Connect(function()
 
         telemetry:SetText(
             string.format(
-                "FPS  %d   •   PING  %s   •   SESSION  %d:%02d",
+                "FPS  %d   |   PING  %s   |   SESSION  %d:%02d",
                 fps,
                 getPing(),
                 minutes,
