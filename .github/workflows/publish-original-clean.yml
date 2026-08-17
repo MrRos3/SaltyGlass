@@ -35,7 +35,7 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          import hashlib, json, re, shutil
+          import hashlib, json, re
 
           root = Path('.')
           icons_path = root / 'icons' / 'Lucide.lua'
@@ -48,7 +48,7 @@ jobs:
           required = {
               'music','play','pause','square','repeat','repeat-2','volume-2','x','minus','plus',
               'move-diagonal-2','chevron-down','skip-back','skip-forward','log-out','home','user',
-              'settings','eye','globe','globe-2'
+              'settings','eye','globe'
           }
           missing = sorted(required - set(entries))
           if missing:
@@ -87,7 +87,8 @@ jobs:
               '        screenGui:SetAttribute("UISoundsEnabled", premiumFx.uiSoundsEnabled)\n'
               '    end\n'
           )
-          if 'screenGui:SetAttribute("UISoundsEnabled", premiumFx.uiSoundsEnabled)' not in original[original.find('function premiumFx.setUiSounds'):original.find('function premiumFx.setReduceMotion')]:
+          sound_slice = original[original.find('function premiumFx.setUiSounds'):original.find('function premiumFx.setReduceMotion')]
+          if 'screenGui:SetAttribute("UISoundsEnabled", premiumFx.uiSoundsEnabled)' not in sound_slice:
               if sounds_line not in original:
                   raise SystemExit('Could not patch UI sound state')
               original = original.replace(sounds_line, sounds_replacement, 1)
@@ -98,7 +99,6 @@ jobs:
           (root / 'releases').mkdir(exist_ok=True)
           (root / 'releases' / 'v3.6.3.lua').write_text(original, encoding='utf-8')
 
-          # Studio ModuleScript wrapper: same original-looking core, no generic recreated UI.
           indented = ''.join('    ' + line if line.strip() else line for line in original.splitlines(True))
           module = (
               'local SaltyGlass = { Version = "3.6.3 RC" }\n\n'
@@ -113,19 +113,16 @@ jobs:
           feature = (root / 'feature-pack.lua').read_text(encoding='utf-8')
           (root / 'releases' / 'feature-pack-v1.0.0.lua').write_text(feature, encoding='utf-8')
 
-          # Remove old generic/recreated library GUI files.
-          remove_files = [
+          for rel in [
               'library.lua',
               'src/SaltyGlassLibrary.lua',
               'releases/library-v1.0.0.lua',
               'releases/library-v1.1.0.lua',
-          ]
-          for rel in remove_files:
+          ]:
               p = root / rel
               if p.exists():
                   p.unlink()
 
-          # Clean examples: only original-looking entry points remain.
           examples = root / 'examples'
           examples.mkdir(exist_ok=True)
           for p in examples.iterdir():
@@ -148,7 +145,6 @@ jobs:
               encoding='utf-8'
           )
 
-          # Stable aliases.
           (root / 'loader.lua').write_text(
               'loadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/latest.lua"))()\n',
               encoding='utf-8'
@@ -193,7 +189,7 @@ jobs:
               encoding='utf-8'
           )
 
-          readme = f'''# SaltyGlass\n\nSaltyGlass is the original glass-style Roblox client UI by **MrRos3**. The repository now keeps one visual direction only: the finished original SaltyGlass look.\n\n## Run the original GUI\n\n```lua\nloadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/latest.lua"))()\n```\n\n## Run the original-looking feature pack\n\n```lua\nloadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/feature-pack.lua"))()\n```\n\nThe feature pack loads the original GUI first and then adds Player, World, and Utility controls without replacing its visual design. The World tab uses the original tab chrome and now uses the same UI click/hover sound assets as the rest of SaltyGlass.\n\n### Feature pack\n\nPlayer controls include movement override, WalkSpeed, jump strength, hold-Shift sprint, sprint speed, camera FOV, max camera zoom, mouse sensitivity, camera height offset, and reset. World controls include fullbright, fog, shadows, time of day, brightness, exposure, saturation, contrast, bloom, bloom intensity, sun rays, and reset. Utility controls include crosshair options plus an FPS/ping/session overlay.\n\n## Lucide icons\n\nThe original icon renderer now contains the full vendored Lucide catalog: **{icon_count} icon assets** from `MrRos3/Icons/lucide/dist/Icons.lua`. Any catalog key can be passed to the renderer; the feature pack uses the catalog for the World globe icon.\n\nThe standalone catalog is also available at `icons/Lucide.lua`.\n\n## Repository layout\n\n- `latest.lua` — clean original SaltyGlass v3.6.3 RC.\n- `feature-pack.lua` — original GUI plus the expanded feature set.\n- `showcase.lua` — one-line feature-pack launcher.\n- `icons/Lucide.lua` — complete Roblox Lucide asset table.\n- `src/SaltyGlass.client.lua` — Studio LocalScript source.\n- `src/SaltyGlassModule.lua` — Studio ModuleScript wrapper.\n- `releases/v3.6.3.lua` — pinned original release.\n- `releases/feature-pack-v1.0.0.lua` — pinned feature-pack release.\n\n`HttpGet` + `loadstring` requires a compatible client environment. For normal Roblox Studio projects, use the sources under `src/`.\n'''
+          readme = f'''# SaltyGlass\n\nSaltyGlass is the original glass-style Roblox client UI by **MrRos3**. The repository now keeps one visual direction only: the finished original SaltyGlass look.\n\n## Run the original GUI\n\n```lua\nloadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/latest.lua"))()\n```\n\n## Run the original-looking feature pack\n\n```lua\nloadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/feature-pack.lua"))()\n```\n\nThe feature pack loads the original GUI first and then adds Player, World, and Utility controls without replacing its visual design. The World tab uses the original tab chrome and the same UI click/hover sound assets as the rest of SaltyGlass.\n\n### Feature pack\n\nPlayer controls include movement override, WalkSpeed, jump strength, hold-Shift sprint, sprint speed, camera FOV, max camera zoom, mouse sensitivity, camera height offset, and reset. World controls include fullbright, fog, shadows, time of day, brightness, exposure, saturation, contrast, bloom, bloom intensity, sun rays, and reset. Utility controls include crosshair options plus an FPS/ping/session overlay.\n\n## Lucide icons\n\nThe original icon renderer now contains the full vendored Lucide catalog: **{icon_count} icon assets** from `MrRos3/Icons/lucide/dist/Icons.lua`. Any catalog key can be passed to the renderer; the feature pack uses `globe` for the World tab.\n\nThe standalone catalog is also available at `icons/Lucide.lua`.\n\n## Repository layout\n\n- `latest.lua` — clean original SaltyGlass v3.6.3 RC.\n- `feature-pack.lua` — original GUI plus the expanded feature set.\n- `showcase.lua` — one-line feature-pack launcher.\n- `icons/Lucide.lua` — complete Roblox Lucide asset table.\n- `src/SaltyGlass.client.lua` — Studio LocalScript source.\n- `src/SaltyGlassModule.lua` — Studio ModuleScript wrapper.\n- `releases/v3.6.3.lua` — pinned original release.\n- `releases/feature-pack-v1.0.0.lua` — pinned feature-pack release.\n\n`HttpGet` + `loadstring` requires a compatible client environment. For normal Roblox Studio projects, use the sources under `src/`.\n'''
           (root / 'README.md').write_text(readme, encoding='utf-8')
 
           old_changelog = (root / 'CHANGELOG.md').read_text(encoding='utf-8') if (root / 'CHANGELOG.md').exists() else '# Changelog\n'
