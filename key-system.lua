@@ -73,11 +73,7 @@ local function scale(obj)
 end
 
 local function tw(obj,d,props)
-    local t=TweenService:Create(
-        obj,
-        TweenInfo.new(d,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),
-        props
-    )
+    local t=TweenService:Create(obj,TweenInfo.new(d,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),props)
     t:Play()
     return t
 end
@@ -91,12 +87,8 @@ local function sound(config,id,vol)
         s.Volume=vol or 0.2
         s.Parent=SoundService
         s:Play()
-        s.Ended:Connect(function()
-            if s.Parent then s:Destroy() end
-        end)
-        task.delay(3,function()
-            if s.Parent then s:Destroy() end
-        end)
+        s.Ended:Connect(function() if s.Parent then s:Destroy() end end)
+        task.delay(3,function() if s.Parent then s:Destroy() end end)
     end)
 end
 
@@ -147,13 +139,7 @@ function KeySystem.Open(options)
     local oldBlur=Lighting:FindFirstChild("SaltyKeySystemBlur")
     if oldBlur then oldBlur:Destroy() end
 
-    local state={
-        destroyed=false,
-        busy=false,
-        attempts=0,
-        connections={},
-        statusToken=0,
-    }
+    local state={destroyed=false,busy=false,attempts=0,connections={},statusToken=0}
 
     local blur=Instance.new("BlurEffect")
     blur.Name="SaltyKeySystemBlur"
@@ -208,17 +194,8 @@ function KeySystem.Open(options)
 
     local glass=Instance.new("UIGradient")
     glass.Rotation=48
-    glass.Color=ColorSequence.new({
-        ColorSequenceKeypoint.new(0,Color3.fromRGB(42,53,86)),
-        ColorSequenceKeypoint.new(0.32,COLORS.Mid),
-        ColorSequenceKeypoint.new(0.72,COLORS.Base),
-        ColorSequenceKeypoint.new(1,Color3.fromRGB(6,9,16)),
-    })
-    glass.Transparency=NumberSequence.new({
-        NumberSequenceKeypoint.new(0,0.14),
-        NumberSequenceKeypoint.new(0.38,0.50),
-        NumberSequenceKeypoint.new(1,0.88),
-    })
+    glass.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(42,53,86)),ColorSequenceKeypoint.new(0.32,COLORS.Mid),ColorSequenceKeypoint.new(0.72,COLORS.Base),ColorSequenceKeypoint.new(1,Color3.fromRGB(6,9,16))})
+    glass.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0.14),NumberSequenceKeypoint.new(0.38,0.50),NumberSequenceKeypoint.new(1,0.88)})
     glass.Parent=card
 
     local ambientA=Instance.new("Frame")
@@ -254,13 +231,8 @@ function KeySystem.Open(options)
     sweep.BorderSizePixel=0
     sweep.ZIndex=6
     sweep.Parent=card
-
     local sweepGradient=Instance.new("UIGradient")
-    sweepGradient.Transparency=NumberSequence.new({
-        NumberSequenceKeypoint.new(0,1),
-        NumberSequenceKeypoint.new(0.5,0.25),
-        NumberSequenceKeypoint.new(1,1),
-    })
+    sweepGradient.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(0.5,0.25),NumberSequenceKeypoint.new(1,1)})
     sweepGradient.Parent=sweep
 
     local emblemHalo=Instance.new("Frame")
@@ -284,7 +256,6 @@ function KeySystem.Open(options)
     emblem.Parent=emblemHalo
     round(emblem,15)
     local emblemStroke=stroke(emblem,0.48,1)
-
     local keyIcon=icon(emblem,icons,"key",21,config.Accent,10)
     keyIcon.AnchorPoint=Vector2.new(0.5,0.5)
     keyIcon.Position=UDim2.fromScale(0.5,0.5)
@@ -324,11 +295,9 @@ function KeySystem.Open(options)
     secureBadge.Parent=card
     round(secureBadge,10)
     stroke(secureBadge,0.70,1)
-
     local shieldIcon=icon(secureBadge,icons,"shield-check",13,config.Accent,10)
     shieldIcon.AnchorPoint=Vector2.new(0,0.5)
     shieldIcon.Position=UDim2.new(0,10,0.5,0)
-
     local badgeText=Instance.new("TextLabel")
     badgeText.Position=UDim2.fromOffset(31,0)
     badgeText.Size=UDim2.new(1,-38,1,0)
@@ -363,7 +332,6 @@ function KeySystem.Open(options)
     inputShell.Parent=card
     round(inputShell,15)
     local inputStroke=stroke(inputShell,0.66,1)
-
     local inputInner=Instance.new("Frame")
     inputInner.Position=UDim2.fromOffset(1,1)
     inputInner.Size=UDim2.new(1,-2,1,-2)
@@ -373,15 +341,10 @@ function KeySystem.Open(options)
     inputInner.ZIndex=8
     inputInner.Parent=inputShell
     round(inputInner,14)
-
     local lockIcon=icon(inputInner,icons,"lock-keyhole",17,COLORS.Muted,10)
-    if lockIcon.Image=="" then
-        lockIcon.Image=icons["lock"] or ""
-        lockIcon:SetAttribute("LucideName","lock")
-    end
+    if lockIcon.Image=="" then lockIcon.Image=icons["lock"] or "" lockIcon:SetAttribute("LucideName","lock") end
     lockIcon.AnchorPoint=Vector2.new(0,0.5)
     lockIcon.Position=UDim2.new(0,16,0.5,0)
-
     local input=Instance.new("TextBox")
     input.Position=UDim2.fromOffset(48,0)
     input.Size=UDim2.new(1,-128,1,0)
@@ -396,7 +359,6 @@ function KeySystem.Open(options)
     input.TextXAlignment=Enum.TextXAlignment.Left
     input.ZIndex=10
     input.Parent=inputInner
-
     local inputChip=Instance.new("Frame")
     inputChip.AnchorPoint=Vector2.new(1,0.5)
     inputChip.Position=UDim2.new(1,-10,0.5,0)
@@ -407,7 +369,6 @@ function KeySystem.Open(options)
     inputChip.ZIndex=10
     inputChip.Parent=inputInner
     round(inputChip,9)
-
     local inputChipText=Instance.new("TextLabel")
     inputChipText.Size=UDim2.fromScale(1,1)
     inputChipText.BackgroundTransparency=1
@@ -428,7 +389,6 @@ function KeySystem.Open(options)
     statusPill.Parent=card
     round(statusPill,11)
     local statusStroke=stroke(statusPill,0.83,1)
-
     local statusDot=Instance.new("Frame")
     statusDot.AnchorPoint=Vector2.new(0,0.5)
     statusDot.Position=UDim2.new(0,12,0.5,0)
@@ -439,7 +399,6 @@ function KeySystem.Open(options)
     statusDot.ZIndex=10
     statusDot.Parent=statusPill
     round(statusDot,6)
-
     local status=Instance.new("TextLabel")
     status.Position=UDim2.fromOffset(28,0)
     status.Size=UDim2.new(1,-40,1,0)
@@ -465,16 +424,9 @@ function KeySystem.Open(options)
     round(verify,15)
     local verifyStroke=stroke(verify,0.48,1)
     local verifyScale=scale(verify)
-
     local verifyGradient=Instance.new("UIGradient")
-    verifyGradient.Rotation=0
-    verifyGradient.Color=ColorSequence.new({
-        ColorSequenceKeypoint.new(0,config.Accent),
-        ColorSequenceKeypoint.new(0.55,config.Accent:Lerp(Color3.new(1,1,1),0.10)),
-        ColorSequenceKeypoint.new(1,config.Accent:Lerp(Color3.fromRGB(93,231,255),0.16)),
-    })
+    verifyGradient.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,config.Accent),ColorSequenceKeypoint.new(0.55,config.Accent:Lerp(Color3.new(1,1,1),0.10)),ColorSequenceKeypoint.new(1,config.Accent:Lerp(Color3.fromRGB(93,231,255),0.16))})
     verifyGradient.Parent=verify
-
     local verifyText=Instance.new("TextLabel")
     verifyText.AnchorPoint=Vector2.new(0.5,0.5)
     verifyText.Position=UDim2.new(0.5,-8,0.5,0)
@@ -486,7 +438,6 @@ function KeySystem.Open(options)
     verifyText.TextSize=10
     verifyText.ZIndex=10
     verifyText.Parent=verify
-
     local arrowIcon=icon(verify,icons,"arrow-right",15,COLORS.Text,10)
     arrowIcon.AnchorPoint=Vector2.new(0.5,0.5)
     arrowIcon.Position=UDim2.new(0.5,58,0.5,0)
@@ -494,7 +445,6 @@ function KeySystem.Open(options)
     local footerIcon=icon(card,icons,"shield",11,COLORS.Muted,9)
     footerIcon.AnchorPoint=Vector2.new(0.5,0.5)
     footerIcon.Position=UDim2.new(0.5,-74,1,-27)
-
     local footer=Instance.new("TextLabel")
     footer.AnchorPoint=Vector2.new(0.5,0.5)
     footer.Position=UDim2.new(0.5,16,1,-27)
@@ -529,20 +479,10 @@ function KeySystem.Open(options)
     local function destroy()
         if state.destroyed then return end
         state.destroyed=true
-        for _,c in ipairs(state.connections) do
-            pcall(function() c:Disconnect() end)
-        end
-        if blur and blur.Parent then
-            if config.ReduceMotion then
-                blur.Size=0
-            else
-                tw(blur,0.18,{Size=0})
-            end
-        end
+        for _,c in ipairs(state.connections) do pcall(function() c:Disconnect() end) end
+        if blur and blur.Parent then if config.ReduceMotion then blur.Size=0 else tw(blur,0.18,{Size=0}) end end
         if gui and gui.Parent then gui:Destroy() end
-        task.delay(0.20,function()
-            if blur and blur.Parent then blur:Destroy() end
-        end)
+        task.delay(0.20,function() if blur and blur.Parent then blur:Destroy() end end)
     end
 
     local function fail(message)
@@ -554,31 +494,17 @@ function KeySystem.Open(options)
         statusStroke.Color=COLORS.Danger
         statusStroke.Transparency=0.62
         sound(config,config.ClickSoundId,0.22)
-
         if not config.ReduceMotion then
             local base=card.Position
             tw(card,0.055,{Position=base+UDim2.fromOffset(-7,0)})
-            task.delay(0.055,function()
-                if card.Parent then
-                    tw(card,0.055,{Position=base+UDim2.fromOffset(7,0)})
-                end
-            end)
-            task.delay(0.11,function()
-                if card.Parent then tw(card,0.07,{Position=base}) end
-            end)
+            task.delay(0.055,function() if card.Parent then tw(card,0.055,{Position=base+UDim2.fromOffset(7,0)}) end end)
+            task.delay(0.11,function() if card.Parent then tw(card,0.07,{Position=base}) end end)
         end
-
         task.delay(0.72,function()
             if state.destroyed then return end
-            if inputStroke.Parent then
-                inputStroke.Color=COLORS.Edge
-                inputStroke.Transparency=0.66
-            end
+            if inputStroke.Parent then inputStroke.Color=COLORS.Edge inputStroke.Transparency=0.66 end
             if lockIcon.Parent then lockIcon.ImageColor3=COLORS.Muted end
-            if statusStroke.Parent then
-                statusStroke.Color=COLORS.Edge
-                statusStroke.Transparency=0.83
-            end
+            if statusStroke.Parent then statusStroke.Color=COLORS.Edge statusStroke.Transparency=0.83 end
         end)
     end
 
@@ -598,16 +524,12 @@ function KeySystem.Open(options)
         arrowIcon.ImageColor3=COLORS.Base
         verifyGradient.Enabled=false
         sound(config,config.ClickSoundId,0.30)
-
         if not config.ReduceMotion then
             tw(verifyScale,0.12,{Scale=1.018})
             tw(emblemHalo,0.18,{BackgroundTransparency=0.78})
             tw(keyIcon,0.18,{ImageColor3=COLORS.Success})
-            task.delay(0.13,function()
-                if verifyScale.Parent then tw(verifyScale,0.12,{Scale=1}) end
-            end)
+            task.delay(0.13,function() if verifyScale.Parent then tw(verifyScale,0.12,{Scale=1}) end end)
         end
-
         task.delay(config.SuccessDelay,function()
             if state.destroyed then return end
             local cb=config.OnSuccess
@@ -619,44 +541,29 @@ function KeySystem.Open(options)
     local function verifyKey()
         if state.busy then return end
         local entered=input.Text
-        if entered=="" then
-            fail("Enter an access key first")
-            return
-        end
-
+        if entered=="" then fail("Enter an access key first") return end
         state.busy=true
         state.attempts=state.attempts+1
         setStatus("Verifying encrypted access...",config.Accent)
         sound(config,config.ClickSoundId,0.28)
-
         if not config.ReduceMotion then
             tw(verifyScale,0.08,{Scale=0.985})
-            task.delay(0.08,function()
-                if verifyScale.Parent then tw(verifyScale,0.10,{Scale=1}) end
-            end)
+            task.delay(0.08,function() if verifyScale.Parent then tw(verifyScale,0.10,{Scale=1}) end end)
         end
-
         task.delay(config.ReduceMotion and 0 or 0.16,function()
             if state.destroyed then return end
-
             local valid=keySet[entered]==true
             if type(config.Validator)=="function" then
                 local ok,result=pcall(config.Validator,entered)
                 valid=ok and result==true
             end
-
-            if valid then
-                success()
-                return
-            end
-
+            if valid then success() return end
             if config.MaxAttempts>0 and state.attempts>=config.MaxAttempts then
                 fail("Access locked  /  maximum attempts reached")
                 verify.Active=false
                 input.TextEditable=false
                 return
             end
-
             fail("Invalid key  /  please try again")
         end)
     end
@@ -668,7 +575,6 @@ function KeySystem.Open(options)
         tw(inputShell,0.14,{BackgroundTransparency=0.18})
         tw(inputChip,0.14,{BackgroundTransparency=0.80})
     end)
-
     connect(input.FocusLost,function(enterPressed)
         if not state.busy then
             inputStroke.Color=COLORS.Edge
@@ -679,7 +585,6 @@ function KeySystem.Open(options)
         end
         if enterPressed then verifyKey() end
     end)
-
     connect(verify.MouseEnter,function()
         sound(config,config.HoverSoundId,0.10)
         if not state.busy then
@@ -689,7 +594,6 @@ function KeySystem.Open(options)
             tw(arrowIcon,0.12,{Position=UDim2.new(0.5,63,0.5,0)})
         end
     end)
-
     connect(verify.MouseLeave,function()
         if not state.busy then
             tw(verify,0.12,{BackgroundTransparency=0.10})
@@ -698,20 +602,16 @@ function KeySystem.Open(options)
             tw(arrowIcon,0.12,{Position=UDim2.new(0.5,58,0.5,0)})
         end
     end)
-
     connect(verify.MouseButton1Click,verifyKey)
-
     connect(emblem.MouseEnter,function()
         sound(config,config.HoverSoundId,0.08)
         tw(emblemHalo,0.14,{BackgroundTransparency=0.82})
         tw(emblemStroke,0.14,{Transparency=0.28})
     end)
-
     connect(emblem.MouseLeave,function()
         tw(emblemHalo,0.14,{BackgroundTransparency=0.91})
         tw(emblemStroke,0.14,{Transparency=0.48})
     end)
-
     connect(UserInputService.InputBegan,function(userInput,processed)
         if processed or state.destroyed then return end
         if userInput.KeyCode==config.ToggleKey then
@@ -730,19 +630,16 @@ function KeySystem.Open(options)
         cardStroke.Transparency=1
         cardScale.Scale=0.975
         cardGlow.BackgroundTransparency=1
-
         tw(card,0.24,{Position=final,BackgroundTransparency=0.06})
         tw(cardStroke,0.24,{Transparency=0.38})
         tw(cardScale,0.24,{Scale=1})
         tw(cardGlow,0.32,{BackgroundTransparency=0.93})
-
         task.delay(0.12,function()
             if sweep.Parent and not state.destroyed then
                 sweep.Position=UDim2.new(-0.25,0,0.5,0)
                 tw(sweep,0.85,{Position=UDim2.new(1.25,0,0.5,0)})
             end
         end)
-
         task.spawn(function()
             while not state.destroyed and card.Parent do
                 tw(glass,8,{Rotation=68})
