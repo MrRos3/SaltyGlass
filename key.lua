@@ -1,4 +1,4 @@
-local source=game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/key-system.lua?v=1.1.0-premium")
+local source=game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/key-system.lua?v=1.3.0-fixed")
 local chunk,compileError=loadstring(source)
 assert(chunk,"SaltyGlass key-system.lua failed to compile: "..tostring(compileError))
 local KeySystem=chunk()
