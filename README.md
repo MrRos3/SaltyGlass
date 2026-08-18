@@ -12,7 +12,19 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/mai
 loadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/feature-pack.lua"))()
 ```
 
-Feature Pack 2.0 loads the original-looking Player/World/Utility pack plus `framework.lua`, which adds RGB + HEX accent controls, profiles, roles, feature flags, update channels, notification history, opt-in telemetry hooks, backup/recovery, and a module/feature registry.
+Feature Pack 2.0 loads the original-looking Player/World/Utility pack plus `framework.lua`.
+
+Framework **v2.1** adds:
+- RGB + HEX accent picker
+- feature/module registry
+- permission-aware command bridge
+- profiles with file persistence + session fallback
+- user/beta/admin/owner roles
+- stable/beta/dev update channels
+- feature flags
+- notification history
+- opt-in telemetry hooks
+- backup/recovery snapshots
 
 ## Key gate
 ```lua
@@ -49,6 +61,20 @@ Salty:RegisterFeature({
 ```
 
 Modules can be registered with `RegisterModule()` or loaded with `LoadModule()`.
+
+Commands can be added with `RegisterCommand()` and run with `ExecuteCommand()` or `RunCommandLine()`:
+
+```lua
+Salty:RegisterCommand("hello", function(api, name)
+    api:Notify("Hello " .. tostring(name or "Salty"))
+end, {
+    Role = "user",
+})
+
+Salty:RunCommandLine("hello MrRos3")
+```
+
+See `examples/FutureModule.lua` for a complete feature + command extension example.
 
 ## Remote validator
 `server/validator-worker.js` is a Cloudflare Workers + KV example. Key records may include `expiresAt`, `role`, `updateChannel`, `featureFlags`, and the binding/session fields managed by the worker.
