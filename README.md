@@ -14,9 +14,6 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/mai
 
 The feature pack adds Player, World, and Utility features to the original UI. The World tab uses the original tab chrome and the original UI click/hover sounds.
 
-## Lucide
-`icons/Lucide.lua` vendors all **1715** generated Roblox Lucide assets from `MrRos3/Icons`; the original renderer exposes **1716** names including preserved legacy aliases.
-
 ## Main files
 - `latest.lua` — clean original v3.6.3 RC
 - `feature-pack.lua` — original UI plus features
