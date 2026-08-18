@@ -1,12 +1,18 @@
-// SaltyGlass remote key validator for Cloudflare Workers.
-// Bind a KV namespace named SALTY_KEYS to this Worker.
+// SaltyGlass validator for Cloudflare Workers + KV.
+// Bind a KV namespace named SALTY_KEYS.
 //
 // Example KV key: SALTY-ACCESS
-// Example KV JSON value:
+// Example value:
 // {
 //   "enabled": true,
 //   "expiresAt": "2026-12-31T23:59:59Z",
-//   "bindingId": null
+//   "bindingId": null,
+//   "role": "beta",
+//   "updateChannel": "beta",
+//   "featureFlags": {
+//     "newWorldTools": true,
+//     "experimentalVisuals": false
+//   }
 // }
 
 function json(data, status = 200) {
@@ -26,7 +32,10 @@ export default {
     }
 
     if (!env.SALTY_KEYS) {
-      return json({ valid: false, message: "SALTY_KEYS KV binding is not configured" }, 500);
+      return json(
+        { valid: false, message: "SALTY_KEYS KV binding is not configured" },
+        500
+      );
     }
 
     let body;
@@ -42,17 +51,22 @@ export default {
     }
 
     const record = await env.SALTY_KEYS.get(key, { type: "json" });
+
     if (!record || record.enabled !== true) {
       return json({ valid: false, message: "Invalid key" }, 401);
     }
 
     const expiryMs = Date.parse(String(record.expiresAt || ""));
+
     if (!Number.isFinite(expiryMs) || Date.now() >= expiryMs) {
-      return json({
-        valid: false,
-        message: "Key expired",
-        expiresAt: record.expiresAt || null,
-      }, 401);
+      return json(
+        {
+          valid: false,
+          message: "Key expired",
+          expiresAt: record.expiresAt || null,
+        },
+        401
+      );
     }
 
     const binding = body.binding || {};
@@ -68,19 +82,33 @@ export default {
     }
 
     if (record.bindingId && record.bindingId !== bindingId) {
-      return json({ valid: false, message: "Key is bound to another client" }, 403);
+      return json(
+        {
+          valid: false,
+          message: "Key is bound to another client",
+        },
+        403
+      );
     }
 
     const suppliedSession = String(body.sessionToken || "");
+
     if (
       record.sessionToken &&
       suppliedSession &&
       suppliedSession !== record.sessionToken
     ) {
-      return json({ valid: false, message: "Session token mismatch" }, 403);
+      return json(
+        {
+          valid: false,
+          message: "Session token mismatch",
+        },
+        403
+      );
     }
 
     const sessionToken = suppliedSession || crypto.randomUUID();
+
     const nextRecord = {
       ...record,
       bindingId,
@@ -90,16 +118,25 @@ export default {
       lastSeenAt: new Date().toISOString(),
     };
 
-    const ttlSeconds = Math.max(60, Math.floor((expiryMs - Date.now()) / 1000));
-    await env.SALTY_KEYS.put(key, JSON.stringify(nextRecord), {
-      expirationTtl: ttlSeconds,
-    });
+    const ttlSeconds = Math.max(
+      60,
+      Math.floor((expiryMs - Date.now()) / 1000)
+    );
+
+    await env.SALTY_KEYS.put(
+      key,
+      JSON.stringify(nextRecord),
+      { expirationTtl: ttlSeconds }
+    );
 
     return json({
       valid: true,
       message: "Access granted",
       expiresAt: record.expiresAt,
       sessionToken,
+      role: record.role || "user",
+      updateChannel: record.updateChannel || "stable",
+      featureFlags: record.featureFlags || {},
     });
   },
 };

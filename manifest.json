@@ -2,22 +2,44 @@
   "name": "SaltyGlass",
   "owner": "MrRos3",
   "version": "3.6.3 RC",
-  "feature_pack_version": "1.0.0",
+  "feature_pack_version": "2.0.0",
+  "framework_version": "1.0.0",
+  "key_launcher_version": "2.0.0",
+  "key_ui_version": "1.3.0",
   "stable_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/latest.lua",
   "feature_pack_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/feature-pack.lua",
+  "framework_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/framework.lua",
+  "key_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/key.lua",
+  "key_system_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/key-system.lua",
   "pinned_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/releases/v3.6.3.lua",
-  "feature_pack_pinned_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/releases/feature-pack-v1.0.0.lua",
-  "lucide": {
-    "catalog": "icons/Lucide.lua",
-    "source": "MrRos3/Icons/lucide/dist/Icons.lua",
-    "vendor_count": 1715,
-    "renderer_count": 1716,
-    "sha256": "36581936d1ec3ff107ae514cd09422f43ecaae9b3fed5759ec1a02ad063a7ccd"
+  "feature_pack_base_pinned_raw": "https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/releases/feature-pack-v1.0.0.lua",
+  "validator": "server/validator-worker.js",
+  "framework": {
+    "feature_registry": true,
+    "modules": true,
+    "profiles": true,
+    "roles": [
+      "user",
+      "beta",
+      "admin",
+      "owner"
+    ],
+    "update_channels": [
+      "stable",
+      "beta",
+      "dev"
+    ],
+    "feature_flags": true,
+    "notification_history": true,
+    "telemetry_opt_in": true,
+    "backup_recovery": true,
+    "rgb_hex_color_picker": true
   },
   "entrypoints": {
     "original": "latest.lua",
     "feature_pack": "feature-pack.lua",
-    "showcase": "showcase.lua",
+    "key_gate": "key.lua",
+    "framework": "framework.lua",
     "studio_local_script": "src/SaltyGlass.client.lua",
     "studio_module": "src/SaltyGlassModule.lua"
   }
