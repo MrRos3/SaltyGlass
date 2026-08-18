@@ -1,4 +1,4 @@
-local source=game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/key-system.lua")
+local source=game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/key-system.lua?v=1.1.0-premium")
 local chunk,compileError=loadstring(source)
 assert(chunk,"SaltyGlass key-system.lua failed to compile: "..tostring(compileError))
 local KeySystem=chunk()
@@ -12,7 +12,7 @@ KeySystem.Open({
     Blur=true,
     ReduceMotion=false,
     OnSuccess=function()
-        local guiSource=game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/feature-pack.lua")
+        local guiSource=game:HttpGet("https://raw.githubusercontent.com/MrRos3/SaltyGlass/main/feature-pack.lua?v=feature-pack-1.0.0")
         local guiChunk,guiCompileError=loadstring(guiSource)
         assert(guiChunk,"SaltyGlass feature-pack.lua failed to compile: "..tostring(guiCompileError))
         guiChunk()
